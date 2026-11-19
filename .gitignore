@@ -1,0 +1,22 @@
+node_modules/
+dist/
+dist-apk/
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+
+# private planning notes
+plan.md
+
+# Android signing – NEVER commit
+*.jks
+*.keystore
+keystore.properties
+android/keystore.properties
+android/local.properties
+
+# iOS / App Store Connect secrets – NEVER commit
+*.p8
+*.p12
+*.mobileprovision
