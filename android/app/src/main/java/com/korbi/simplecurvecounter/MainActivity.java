@@ -1,5 +1,14 @@
 package com.korbi.simplecurvecounter;
 
-import com.getcapacitor.BridgeActivity;
+import android.os.Bundle;
 
-public class MainActivity extends BridgeActivity {}
+import com.getcapacitor.BridgeActivity;
+import com.korbi.simplecurvecounter.tracking.RecorderPlugin;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(RecorderPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}

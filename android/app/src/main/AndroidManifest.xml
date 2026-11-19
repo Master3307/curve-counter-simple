@@ -24,6 +24,12 @@
 
         </activity>
 
+        <!-- Records GPS while a ride is armed/running, also with the screen off -->
+        <service
+            android:name=".tracking.RecorderService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -45,7 +51,7 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
-    <!-- Foreground service with a permanent notification (planned native SimpleCurveCounter plugin) -->
+    <!-- Foreground service with a permanent notification (tracking/RecorderService) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
