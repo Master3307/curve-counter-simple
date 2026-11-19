@@ -1,55 +1,81 @@
 /**
- * Glue: GPS fixes → ride detector → curve detector + ride stats → store.
- * Runs in the WebView for now (foreground only). The native plugin will take this over.
+ * Glue: fix log → ride detector → curve detector + ride stats → store.
+ *
+ * The engine *pulls* fixes from the source's numbered log (`pump`) instead of reacting to live
+ * callbacks only. That makes it robust against the WebView being frozen (screen off) and the app
+ * being killed:
+ * - frozen: the native recorder keeps logging; on wake-up `pump` processes the backlog in order.
+ * - killed: on the next start `initEngine` drops the half-built ride and replays the log from
+ *   `session.from`, which rebuilds exactly the same ride (the detectors are deterministic).
+ *
+ * TODO(plan 1.5): move ride + curve detection into the native plugin so the notification shows
+ * live counts while the WebView sleeps. Until then the notification is updated whenever JS runs.
  */
-import { CurveDetector } from '../logic/curves';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { CurveDetector, type Curve } from '../logic/curves';
 import type { Fix } from '../logic/geo';
 import { MANUAL_START, RideDetector } from '../logic/rideDetector';
 import { RideStats } from '../logic/rideStats';
-import { useStore } from '../store';
-import { playDemo, watchGps, type Stop } from './source';
+import { STRINGS } from '../i18n/strings';
+import { fmtDuration, fmtSpeed, speedUnit } from '../ui/format';
+import { flushStorage, useStore, type Ride, type Session } from '../store';
+import { defaultSource, demoSource, type FixSource, type Stop } from './source';
 
-let stopSource: Stop | null = null;
-let tickTimer: ReturnType<typeof setInterval> | null = null;
+/** Max fixes per read (keeps a 10-hour replay from blocking the UI in one go). */
+const READ_LIMIT = 2000;
+
+let source: FixSource = defaultSource();
+let unsubscribe: Stop | null = null;
+/** next sequence number to process in the source's log */
+let cursor = 0;
+let pumping: Promise<void> | null = null;
+let pumpAgain = false;
+let started = false;
+
 let rideDetector = new RideDetector();
 let curves = new CurveDetector();
 let stats = new RideStats();
 let lastFix: Fix | null = null;
+/** curves found in the current batch, written to the store once per batch */
+let newCurves: Curve[] = [];
+/** totals of a ride that continues after its log was lost (web reload); added to the new stats */
+let base: Pick<Ride, 'distanceM' | 'movingS' | 'topSpeed'> | null = null;
+let lastNotify = { key: '', text: '', at: 0 };
 
 const st = () => useStore.getState();
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-function feedRide(fix: Fix) {
-  const id = st().activeId;
-  if (!id) return;
-  st().addCurves(id, curves.push(fix));
-  stats.push(fix);
-  const t = stats.totals();
-  st().updateRide(id, { distanceM: t.distanceM, movingS: t.movingS, avgSpeed: t.avgSpeed, topSpeed: t.topSpeed });
+// ---------------------------------------------------------------------------------------------
+// processing
+
+function activeRide() {
+  const s = st();
+  return s.activeId ? (s.rides.find((r) => r.id === s.activeId) ?? null) : null;
 }
 
-function onFix(fix: Fix) {
-  const speed = fix.speed ?? (lastFix ? derivedSpeed(lastFix, fix) : 0);
-  lastFix = fix;
-  st().setLive({ speed, gpsWeak: fix.accuracy > 25 });
+function feedRide(fix: Fix) {
+  newCurves.push(...curves.push(fix));
+  stats.push(fix);
+}
 
-  const { phase } = st();
-  if (phase === 'riding') {
-    feedRide(fix);
-    // manual rides never end by themselves; automatic (experimental) ones do
-    if (st().rides.find((r) => r.id === st().activeId)?.mode === 'auto') {
-      const ev = rideDetector.push(fix, speed);
-      if (ev?.type === 'end') finishRide(ev.at);
-    }
-    return;
-  }
-  if (phase === 'armed' || phase === 'watching') {
-    const ev = rideDetector.push(fix, speed);
-    if (ev?.type === 'start') {
-      resetDetectors();
-      st().beginRide(ev.at, phase === 'armed' ? 'manual' : 'auto');
-      ev.backlog.forEach(feedRide);
-    }
-  }
+/** Writes the curves and totals collected since the last flush to the store. */
+function flushRide() {
+  const id = st().activeId;
+  if (!id) return;
+  st().addCurves(id, newCurves);
+  newCurves = [];
+  const t = stats.totals();
+  const distanceM = (base?.distanceM ?? 0) + t.distanceM;
+  const movingS = (base?.movingS ?? 0) + t.movingS;
+  st().updateRide(id, {
+    distanceM,
+    movingS,
+    avgSpeed: movingS > 0 ? distanceM / movingS : 0,
+    topSpeed: Math.max(base?.topSpeed ?? 0, t.topSpeed),
+  });
 }
 
 function derivedSpeed(a: Fix, b: Fix) {
@@ -60,86 +86,286 @@ function derivedSpeed(a: Fix, b: Fix) {
   return Math.hypot(dLat, dLon) / dt;
 }
 
-function resetDetectors() {
-  curves = new CurveDetector({ sensitivity: st().settings.sensitivity });
-  stats = new RideStats();
-}
+/** One fix. `seq` = its number in the log. */
+function onFix(fix: Fix, seq: number) {
+  const speed = fix.speed ?? (lastFix ? derivedSpeed(lastFix, fix) : 0);
+  lastFix = { ...fix, speed };
+  const session = st().session;
+  if (!session) return;
 
-function finishRide(at: number, discard = false) {
-  const id = st().activeId;
-  if (!id) return;
-  st().addCurves(id, curves.flush());
-  const ride = st().rides.find((r) => r.id === id);
-  const tooShort = ride && ride.mode === 'auto' && (ride.distanceM < 1000 || at - ride.startedAt < 120_000);
-  if (discard || tooShort) st().deleteRide(id);
-  else st().endRide(id, at);
-  st().clearUndo();
-  rideDetector = new RideDetector({ pauseMinutes: st().settings.pauseMinutes });
-  syncSource();
-}
-
-/** Start or stop GPS depending on the phase (GPS only runs when needed). */
-async function syncSource() {
-  const needGps = st().phase !== 'off';
-  if (needGps && !stopSource && !st().live.demo) {
-    try {
-      stopSource = await watchGps(onFix);
-    } catch {
-      stopSource = null;
+  if (st().phase === 'riding') {
+    feedRide(fix);
+    // manual rides never end by themselves; automatic (experimental) ones do
+    // TODO(plan 1.4): manual ride standing still for 60 min → notification "Forgot to stop?"
+    if (session.mode === 'auto') {
+      const ev = rideDetector.push(fix, speed);
+      if (ev?.type === 'end') finishAutoRide(ev.at, seq + 1);
     }
-  } else if (!needGps && stopSource) {
-    stopSource();
-    stopSource = null;
+    return;
+  }
+  const ev = rideDetector.push(fix, speed);
+  if (ev?.type === 'start') {
+    curves = new CurveDetector({ sensitivity: st().settings.sensitivity });
+    stats = new RideStats();
+    base = null;
+    newCurves = [];
+    // deterministic id: replaying the same log rebuilds the same ride
+    st().beginRide(ev.at, session.mode, `${session.id}-${ev.at}`);
+    ev.backlog.forEach(feedRide);
   }
 }
 
-export function initEngine() {
+/** Closes the active ride: final curve, too-short auto rides are dropped. */
+function closeRide(at: number, discard: boolean) {
+  const ride = activeRide();
+  if (!ride) return;
+  newCurves.push(...curves.flush());
+  flushRide();
+  const r = activeRide()!;
+  const tooShort = r.mode === 'auto' && (r.distanceM < 1000 || at - r.startedAt < 120_000);
+  if (discard || tooShort) st().dropRide(r.id);
+  else st().endRide(r.id, at);
+  st().clearUndo();
+}
+
+/** Auto mode: ride ended by itself, the session keeps watching from fix `from` on. */
+function finishAutoRide(at: number, from: number) {
+  closeRide(at, false);
+  const session = st().session;
+  if (session) st().setSession({ ...session, from });
+  st().setPhase('watching');
+  rideDetector = new RideDetector({ pauseMinutes: st().settings.pauseMinutes });
+}
+
+/** Processes everything new in the log. Safe to call any time, as often as you like. */
+export function pump(): Promise<void> {
+  if (pumping) {
+    pumpAgain = true;
+    return pumping;
+  }
+  pumping = (async () => {
+    do {
+      pumpAgain = false;
+      for (;;) {
+        const sid = st().session?.id;
+        if (!sid) break;
+        let fixes: Fix[];
+        try {
+          fixes = (await source.read(cursor, READ_LIMIT)).fixes;
+        } catch {
+          break;
+        }
+        if (st().session?.id !== sid || !fixes.length) break; // stopped while reading / nothing new
+        const first = cursor;
+        fixes.forEach((f, i) => onFix(f, first + i));
+        cursor = first + fixes.length;
+        flushRide();
+        if (lastFix) st().setLive({ speed: lastFix.speed ?? 0, gpsWeak: lastFix.accuracy > 25 });
+        updateNotification();
+        if (fixes.length < READ_LIMIT) break;
+      }
+    } while (pumpAgain);
+  })().finally(() => {
+    pumping = null;
+  });
+  return pumping;
+}
+
+// ---------------------------------------------------------------------------------------------
+// sessions
+
+function resetDetectors(mode: Session['mode']) {
+  rideDetector = new RideDetector(mode === 'manual' ? MANUAL_START : { pauseMinutes: st().settings.pauseMinutes });
+  curves = new CurveDetector({ sensitivity: st().settings.sensitivity });
+  stats = new RideStats();
+  lastFix = null;
+  newCurves = [];
+  base = null;
+  lastNotify = { key: '', text: '', at: 0 };
+}
+
+function subscribe() {
+  unsubscribe?.();
+  unsubscribe = source.onData(() => void pump());
+}
+
+/** Asks for what recording needs. Returns false if location was refused. */
+async function ensurePermissions(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform() || source.kind === 'demo') return true;
+  try {
+    const p = await Geolocation.requestPermissions({ permissions: ['location'] });
+    if (p.location !== 'granted') return false;
+  } catch {
+    return false;
+  }
+  // the permanent notification needs this on Android 13+ (recording works without it)
+  await LocalNotifications.requestPermissions().catch(() => {});
+  return true;
+}
+
+async function beginSession(mode: Session['mode']): Promise<boolean> {
+  await endSession();
+  st().setLive({ problem: null });
+  if (!(await ensurePermissions())) {
+    st().setLive({ problem: 'noLocation' });
+    return false;
+  }
+  const id = uid();
+  try {
+    await source.start(id);
+  } catch {
+    st().setLive({ problem: 'noLocation' });
+    return false;
+  }
+  cursor = 0;
+  resetDetectors(mode);
+  st().setSession({ id, from: 0, mode });
+  st().setPhase(mode === 'manual' ? 'armed' : 'watching');
+  subscribe();
+  updateNotification(true);
+  void pump();
+  return true;
+}
+
+async function endSession() {
+  unsubscribe?.();
+  unsubscribe = null;
+  if (st().session) st().setSession(null);
+  await source.stop().catch(() => {});
+}
+
+/** After a session ended: back to watching (auto on) or off. */
+async function idle() {
+  if (st().settings.auto && source.kind !== 'demo') {
+    if (!(await beginSession('auto'))) st().setPhase('off');
+  } else {
+    await endSession();
+    st().setPhase('off');
+  }
+  st().setLive({ speed: 0, gpsWeak: false });
+}
+
+// ---------------------------------------------------------------------------------------------
+// notification
+
+function updateNotification(force = false) {
+  if (!source.notify) return;
   const s = st();
-  // a ride that was running when the app was closed: keep it running
-  if (s.phase === 'armed') rideDetector = new RideDetector(MANUAL_START);
-  if (s.phase === 'riding') resetDetectors();
-  if (s.phase === 'off' && s.settings.auto) s.setPhase('watching');
-  syncSource();
-  tickTimer ??= setInterval(() => {
+  const t = STRINGS[s.settings.lang];
+  const ride = activeRide();
+  let title: string;
+  let text: string;
+  if (s.phase === 'riding' && ride) {
+    const now = Math.max(Date.now(), lastFix?.t ?? 0);
+    title = t.statusRiding(fmtDuration(now - ride.startedAt));
+    text = `↰ ${t.left} ${ride.left} · ${t.right} ${ride.right} ↱ · ${fmtSpeed(s.live.speed, s.settings.units)} ${speedUnit(s.settings.units)}`;
+  } else {
+    title = t.appName;
+    text = s.phase === 'armed' ? t.statusArmed : t.statusWatching;
+  }
+  const full = `${title}\n${text}`;
+  const key = `${s.phase}:${ride?.left}:${ride?.right}`;
+  const now = Date.now();
+  // phase or counts changed → right away; only speed/time changed → at most every 5 s
+  if (!force && (full === lastNotify.text || (key === lastNotify.key && now - lastNotify.at < 5000))) return;
+  lastNotify = { key, text: full, at: now };
+  source.notify(title, text);
+}
+
+// ---------------------------------------------------------------------------------------------
+// public API
+
+export async function initEngine() {
+  if (started) return;
+  started = true;
+  const s = st();
+  if (s.session) {
+    const running = await source.active().catch(() => null);
+    if (running === s.session.id) {
+      // recorder kept going while the app was gone → rebuild the ride from the log
+      if (s.activeId) s.dropRide(s.activeId);
+      resetDetectors(s.session.mode);
+      cursor = s.session.from;
+      st().setPhase(s.session.mode === 'manual' ? 'armed' : 'watching');
+      subscribe();
+      await pump();
+    } else {
+      // the log is gone (browser reload, recorder was stopped by the system)
+      const ride = activeRide();
+      const mode = s.session.mode;
+      await endSession();
+      if (ride) {
+        // keep counting into the same ride; its totals so far are kept
+        if (await beginSession(mode)) {
+          rideDetector.force(true);
+          base = { distanceM: ride.distanceM, movingS: ride.movingS, topSpeed: ride.topSpeed };
+          st().setPhase('riding');
+        }
+      } else if (s.phase === 'armed') {
+        await beginSession('manual');
+      } else {
+        await idle();
+      }
+    }
+  } else {
+    // e.g. state from an older version
+    if (s.activeId) {
+      const ride = activeRide();
+      if (ride) s.endRide(ride.id, ride.startedAt + ride.movingS * 1000);
+    }
+    await idle();
+  }
+
+  setInterval(() => {
+    // safety net in case a data ping got lost
+    void pump();
     const ev = rideDetector.tick(Date.now());
-    if (ev?.type === 'end' && st().phase === 'riding') finishRide(ev.at);
-  }, 30_000);
+    if (ev?.type === 'end' && st().phase === 'riding' && st().session?.mode === 'auto') finishAutoRide(ev.at, cursor);
+    // TODO(plan 1.4): armed > 30 min without moving → notification "Still want to ride?", then disarm
+    updateNotification();
+  }, 5_000);
+
+  if (Capacitor.isNativePlatform()) {
+    CapApp.addListener('resume', () => void pump());
+    CapApp.addListener('pause', () => void flushStorage());
+  }
 }
 
 /** Big button: "Start ride" → armed (counting begins when actually moving). */
-export function startRide() {
-  rideDetector = new RideDetector(MANUAL_START);
-  st().setPhase('armed');
-  syncSource();
+export async function startRide() {
+  await beginSession('manual');
 }
 
 /** Big button: "Stop ride" (or "Not riding after all" while armed). */
-export function stopRide(discard = false) {
-  if (st().phase === 'riding') finishRide(Date.now(), discard);
-  else {
-    st().setPhase(st().settings.auto ? 'watching' : 'off');
-    syncSource();
+export async function stopRide(discard = false) {
+  await pump(); // take everything recorded up to now
+  if (st().phase === 'riding') closeRide(Math.max(Date.now(), lastFix?.t ?? 0), discard);
+  await endSession();
+  if (source.kind === 'demo') {
+    source = defaultSource();
+    st().setLive({ demo: false });
   }
+  await idle();
+  void flushStorage();
 }
 
-export function setAutomatic(on: boolean) {
+export async function setAutomatic(on: boolean) {
   st().updateSettings({ auto: on });
-  if (st().phase === 'off' && on) st().setPhase('watching');
-  if (st().phase === 'watching' && !on) st().setPhase('off');
-  rideDetector = new RideDetector({ pauseMinutes: st().settings.pauseMinutes });
-  syncSource();
+  const phase = st().phase;
+  if (phase === 'off' && on) await idle();
+  if (phase === 'watching' && !on) await idle();
 }
 
 /** Demo ride with simulated GPS (for trying the app at home). */
-export function startDemo() {
-  stopSource?.();
-  stopSource = null;
+export async function startDemo() {
+  if (st().phase === 'riding') return;
+  await endSession();
+  source = demoSource(() => void stopRide());
   st().setLive({ demo: true });
-  startRide();
-  stopSource = playDemo(onFix, () => {
-    stopRide();
-    st().setLive({ demo: false, speed: 0 });
-    stopSource = null;
-    syncSource();
-  });
+  await beginSession('manual');
+}
+
+/** Tests / future sources: replace where fixes come from. Call before `initEngine`. */
+export function setSource(s: FixSource) {
+  source = s;
 }

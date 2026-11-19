@@ -57,6 +57,20 @@ export function RideScreen({ problems }: { problems: number }) {
         </button>
       )}
 
+      {live.problem === 'noLocation' && (
+        <button className="fix-banner" onClick={() => setTab('help')}>
+          <IconAlert />
+          <span>{t.noLocation}</span>
+          <b>{t.fixBannerButton} →</b>
+        </button>
+      )}
+      {live.gpsWeak && phase !== 'off' && (
+        <div className="fix-banner" role="alert">
+          <IconAlert />
+          <span>{t.gpsWeak}</span>
+        </div>
+      )}
+
       <div className={`status status-${phase}`} role="status" aria-live="polite">
         <span className="status-dot" />
         <span>{live.demo ? `${t.statusDemo} · ${status}` : status}</span>

@@ -44,17 +44,31 @@ export interface Settings {
   haptics: boolean;
 }
 
+/**
+ * The running recording. `from` = first fix of the current detection epoch in the source's
+ * log: after a cold start the engine replays the log from there and rebuilds the ride.
+ */
+export interface Session {
+  id: string;
+  from: number;
+  /** what started it: the Start button (manual) or the experimental auto mode */
+  mode: 'manual' | 'auto';
+}
+
 export interface Live {
   /** m/s, smoothed */
   speed: number;
   gpsWeak: boolean;
   demo: boolean;
+  /** shown on the ride screen in plain words, never silently ignored */
+  problem: 'noLocation' | null;
 }
 
 interface State {
   rides: Ride[];
   activeId: string | null;
   phase: Phase;
+  session: Session | null;
   settings: Settings;
   tab: Tab;
   live: Live;
@@ -64,22 +78,50 @@ interface State {
 
   setTab(tab: Tab): void;
   setPhase(phase: Phase): void;
+  setSession(session: Session | null): void;
   setLive(live: Partial<Live>): void;
-  beginRide(startedAt: number, mode: Ride['mode']): string;
+  beginRide(startedAt: number, mode: Ride['mode'], id?: string): string;
   updateRide(id: string, patch: Partial<Ride>): void;
   addCurves(id: string, curves: Curve[]): void;
   endRide(id: string, endedAt: number): void;
   deleteRide(id: string): void;
+  /** Removes a ride without offering undo (used when the engine rebuilds a running ride). */
+  dropRide(id: string): void;
   undoDelete(): void;
   clearUndo(): void;
   deleteAll(): void;
   updateSettings(patch: Partial<Settings>): void;
 }
 
+/**
+ * Writes are debounced (at most one per second, the latest state wins), so saving never slows
+ * down counting. Nothing is lost on a crash: the raw fixes are in the recorder's log, and the
+ * running ride is rebuilt from it on the next start.
+ * TODO(milestone 2b): SQLite instead of one JSON blob, once there are many rides.
+ */
+const pending = new Map<string, string>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+function flushPrefs() {
+  flushTimer = null;
+  const items = [...pending];
+  pending.clear();
+  return Promise.all(items.map(([key, value]) => Preferences.set({ key, value })));
+}
 const prefsStorage: StateStorage = {
-  getItem: async (k) => (await Preferences.get({ key: k })).value,
-  setItem: async (k, v) => Preferences.set({ key: k, value: v }),
-  removeItem: async (k) => Preferences.remove({ key: k }),
+  getItem: async (k) => pending.get(k) ?? (await Preferences.get({ key: k })).value,
+  setItem: (k, v) => {
+    pending.set(k, v);
+    flushTimer ??= setTimeout(flushPrefs, 1000);
+  },
+  removeItem: async (k) => {
+    pending.delete(k);
+    await Preferences.remove({ key: k });
+  },
+};
+/** Write pending state now (app goes to the background). */
+export const flushStorage = () => {
+  if (flushTimer) clearTimeout(flushTimer);
+  return flushPrefs();
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -102,19 +144,21 @@ export const useStore = create<State>()(
       rides: [],
       activeId: null,
       phase: 'off',
+      session: null,
       settings: DEFAULT_SETTINGS,
       tab: 'ride',
-      live: { speed: 0, gpsWeak: false, demo: false },
+      live: { speed: 0, gpsWeak: false, demo: false, problem: null },
       lastDeleted: null,
       hydrated: false,
 
       setTab: (tab) => set({ tab }),
       setPhase: (phase) => set({ phase }),
+      setSession: (session) => set({ session }),
       setLive: (live) => set({ live: { ...get().live, ...live } }),
 
-      beginRide(startedAt, mode) {
+      beginRide(startedAt, mode, id = uid()) {
         const ride: Ride = {
-          id: uid(),
+          id,
           startedAt,
           endedAt: null,
           mode,
@@ -159,6 +203,9 @@ export const useStore = create<State>()(
           ...(get().activeId === id ? { activeId: null, phase: get().settings.auto ? 'watching' : 'off' } : {}),
         });
       },
+      dropRide(id) {
+        set({ rides: get().rides.filter((r) => r.id !== id), ...(get().activeId === id ? { activeId: null } : {}) });
+      },
       undoDelete() {
         const d = get().lastDeleted;
         if (!d) return;
@@ -175,7 +222,7 @@ export const useStore = create<State>()(
       name: 'curve-tracker',
       version: 1,
       storage: createJSONStorage(() => prefsStorage),
-      partialize: (s) => ({ rides: s.rides, activeId: s.activeId, phase: s.phase, settings: s.settings }),
+      partialize: (s) => ({ rides: s.rides, activeId: s.activeId, phase: s.phase, session: s.session, settings: s.settings }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         return { ...current, ...p, settings: { ...DEFAULT_SETTINGS, ...p.settings } };

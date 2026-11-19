@@ -1,11 +1,41 @@
 /**
- * Planned native plugin `SimpleCurveCounter` (Kotlin foreground service / Swift CLLocationManager).
- * NOT implemented yet – this file is the contract the native side will fulfil.
- * Native code owns GPS, ride detection, curve detection and storage, so counting continues
- * when the WebView is frozen or the app is in the background. The web UI only reads and controls.
+ * Native plugins.
+ *
+ * 1. `Recorder` (IMPLEMENTED, Android): a foreground service that records GPS fixes into a
+ *    file, with a permanent notification, so a ride keeps recording with the screen off and
+ *    survives the app being killed. The counting itself still runs in TS (engine.ts), which
+ *    replays the fix log whenever the WebView is awake.
+ *    Android code: android/app/src/main/java/com/korbi/simplecurvecounter/tracking/
+ *
+ * 2. `SimpleCurveCounterPlugin` (PLANNED, see plan 1.5): native code owns ride detection,
+ *    curve detection and storage (Room / SQLite), so the notification shows live counts even
+ *    while the WebView sleeps. Contract only – not implemented yet.
  */
+import { registerPlugin } from '@capacitor/core';
 import type { Curve, Sensitivity } from '../logic/curves';
+import type { Fix } from '../logic/geo';
 import type { Phase, Ride } from '../store';
+
+// ---------------------------------------------------------------------------------------------
+// 1. Recorder (implemented)
+
+export interface RecorderPlugin {
+  /** Starts the foreground service and a fresh fix log for `sessionId`. */
+  start(options: { sessionId: string }): Promise<void>;
+  /** Stops the service and deletes the log. */
+  stop(): Promise<void>;
+  /** Up to `limit` fixes with sequence number ≥ from (numbers start at 0). */
+  read(options: { from: number; limit: number }): Promise<{ fixes: Fix[] }>;
+  /** sessionId is set while the service is recording (also after the app was killed). */
+  status(): Promise<{ sessionId: string | null; count: number }>;
+  updateNotification(options: { title: string; text: string }): Promise<void>;
+  addListener(event: 'fix', cb: () => void): Promise<{ remove(): Promise<void> }>;
+}
+
+export const Recorder = registerPlugin<RecorderPlugin>('Recorder');
+
+// ---------------------------------------------------------------------------------------------
+// 2. SimpleCurveCounter (planned)
 
 export interface TrackerConfig {
   auto: boolean;

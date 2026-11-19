@@ -27,6 +27,8 @@ const de = {
   discardConfirm: 'Diese Fahrt beenden und NICHT speichern?',
   stopConfirm: 'Fahrt beenden und speichern?',
   safety: 'Augen auf die Straße. Die App zählt von allein – du musst nichts tun.',
+  noLocation: 'Die App darf deinen Standort nicht sehen. Ohne Standort kann sie keine Kurven zählen.',
+  gpsWeak: 'GPS schwach – Zählen kann ungenau sein',
 
   // rides
   noRides: 'Noch keine Fahrten. Fahr los – die App zählt mit.',
@@ -91,7 +93,7 @@ const de = {
   deleteAllConfirm2: 'Ganz sicher? Alles ist danach weg.',
   version: 'Version',
   placeholderNote:
-    'Vorschau-Version: Im Hintergrund zählt die App erst, wenn der eigene Hintergrund-Dienst fertig ist. Bis dahin: App offen lassen.',
+    'Vorschau-Version. Android: zählt auch mit ausgeschaltetem Bildschirm. iPhone und Browser: App bitte offen lassen.',
 };
 
 export type Strings = typeof de;
@@ -122,6 +124,8 @@ const en: Strings = {
   discardConfirm: 'Stop this ride and do NOT save it?',
   stopConfirm: 'Stop and save the ride?',
   safety: 'Eyes on the road. The app counts by itself – you don’t have to do anything.',
+  noLocation: "The app isn't allowed to see your location. Without it, it can't count curves.",
+  gpsWeak: 'GPS weak – counting may be off',
 
   noRides: 'No rides yet. Just ride – the app counts along.',
   allRides: 'All rides together',
@@ -183,7 +187,7 @@ const en: Strings = {
   deleteAllConfirm2: 'Absolutely sure? Everything will be gone.',
   version: 'Version',
   placeholderNote:
-    'Preview version: counting in the background needs the native background service, which is not finished yet. Until then, keep the app open.',
+    'Preview version. Android: counts with the screen off too. iPhone and browser: please keep the app open.',
 };
 
 export const STRINGS: Record<Lang, Strings> = { de, en };
