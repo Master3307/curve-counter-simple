@@ -72,6 +72,8 @@ interface State {
   settings: Settings;
   tab: Tab;
   live: Live;
+  /** ride to show in the summary card right after it ended (not persisted) */
+  summaryId: string | null;
   /** last deleted ride, for the undo bar (not persisted) */
   lastDeleted: { ride: Ride; index: number } | null;
   hydrated: boolean;
@@ -89,6 +91,7 @@ interface State {
   dropRide(id: string): void;
   undoDelete(): void;
   clearUndo(): void;
+  showSummary(id: string | null): void;
   deleteAll(): void;
   updateSettings(patch: Partial<Settings>): void;
 }
@@ -149,6 +152,7 @@ export const useStore = create<State>()(
       tab: 'ride',
       live: { speed: 0, gpsWeak: false, demo: false, problem: null },
       lastDeleted: null,
+      summaryId: null,
       hydrated: false,
 
       setTab: (tab) => set({ tab }),
@@ -214,6 +218,7 @@ export const useStore = create<State>()(
         set({ rides, lastDeleted: null });
       },
       clearUndo: () => set({ lastDeleted: null }),
+      showSummary: (summaryId) => set({ summaryId }),
       deleteAll: () =>
         set({ rides: [], activeId: null, lastDeleted: null, phase: get().settings.auto ? 'watching' : 'off' }),
       updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),

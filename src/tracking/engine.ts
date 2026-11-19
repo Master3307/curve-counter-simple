@@ -124,7 +124,10 @@ function closeRide(at: number, discard: boolean) {
   const r = activeRide()!;
   const tooShort = r.mode === 'auto' && (r.distanceM < 1000 || at - r.startedAt < 120_000);
   if (discard || tooShort) st().dropRide(r.id);
-  else st().endRide(r.id, at);
+  else {
+    st().endRide(r.id, at);
+    st().showSummary(r.id);
+  }
   st().clearUndo();
 }
 

@@ -109,6 +109,7 @@ describe('engine', () => {
     expect(s.phase).toBe('off');
     expect(s.session).toBeNull();
     expect(s.rides).toHaveLength(1);
+    expect(s.summaryId).toBe(s.rides[0].id); // summary card right after Stop
     return s.rides[0];
   }
 
@@ -166,6 +167,7 @@ describe('engine', () => {
     await e.pump();
     await e.stopRide(true);
     expect(e.useStore.getState().rides).toHaveLength(0);
+    expect(e.useStore.getState().summaryId).toBeNull();
     expect(rec.session).toBeNull();
   });
 

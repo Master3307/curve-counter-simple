@@ -92,6 +92,22 @@ const de = {
   deleteAllConfirm: 'Wirklich ALLE Fahrten löschen?',
   deleteAllConfirm2: 'Ganz sicher? Alles ist danach weg.',
   version: 'Version',
+
+  // ride summary + details
+  summaryTitle: 'Fahrt gespeichert',
+  summaryCurves: (n: number, l: number, r: number) => `Du bist ${n} Kurven gefahren (${l} ↰ / ${r} ↱)`,
+  details: 'Details',
+  hideDetails: 'Weniger anzeigen',
+  strength: { gentle: 'Leicht', medium: 'Mittel', tight: 'Eng', hairpin: 'Kehre' },
+  strengthHint: 'leicht bis 45° · mittel bis 90° · eng bis 150° · Kehre darüber',
+  per100km: (n: string) => `${n} Kurven pro 100 km`,
+  strongestCorner: (lean: string, g: string) => `Stärkste Kurve: ca. ${lean}° Schräglage (${g} g)`,
+  curveSpeed: 'Tempo in Kurven',
+  curveList: 'Alle Kurven',
+  approx: 'ca.',
+  wideCurve: 'weit',
+  noCurves: 'Keine Kurven auf dieser Fahrt.',
+  exportGpx: 'Als GPX-Datei speichern',
   placeholderNote:
     'Vorschau-Version. Android: zählt auch mit ausgeschaltetem Bildschirm. iPhone und Browser: App bitte offen lassen.',
 };
@@ -186,6 +202,21 @@ const en: Strings = {
   deleteAllConfirm: 'Really delete ALL rides?',
   deleteAllConfirm2: 'Absolutely sure? Everything will be gone.',
   version: 'Version',
+
+  summaryTitle: 'Ride saved',
+  summaryCurves: (n: number, l: number, r: number) => `You rode ${n} curves (${l} ↰ / ${r} ↱)`,
+  details: 'Details',
+  hideDetails: 'Show less',
+  strength: { gentle: 'Gentle', medium: 'Medium', tight: 'Tight', hairpin: 'Hairpin' },
+  strengthHint: 'gentle up to 45° · medium up to 90° · tight up to 150° · hairpin above',
+  per100km: (n: string) => `${n} curves per 100 km`,
+  strongestCorner: (lean: string, g: string) => `Strongest curve: about ${lean}° lean (${g} g)`,
+  curveSpeed: 'Speed in curves',
+  curveList: 'All curves',
+  approx: 'approx.',
+  wideCurve: 'wide',
+  noCurves: 'No curves on this ride.',
+  exportGpx: 'Save as GPX file',
   placeholderNote:
     'Preview version. Android: counts with the screen off too. iPhone and browser: please keep the app open.',
 };

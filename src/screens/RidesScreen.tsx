@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore, useT, type Ride } from '../store';
 import { Card, confirm } from '../ui/components';
 import { fmtDate, fmtDistance, fmtDuration, fmtSpeed, fmtTime, speedUnit } from '../ui/format';
 import { IconCurveLeft, IconCurveRight, IconTrash } from '../ui/icons';
+import { RideDetails } from '../ui/RideDetails';
 
 export function RidesScreen() {
   const t = useT();
@@ -10,6 +11,7 @@ export function RidesScreen() {
   const activeId = useStore((s) => s.activeId);
   const lastDeleted = useStore((s) => s.lastDeleted);
   const { units, lang } = useStore((s) => s.settings);
+  const [open, setOpen] = useState<string | null>(null);
 
   // the undo bar disappears after 5 seconds
   useEffect(() => {
@@ -110,6 +112,10 @@ export function RidesScreen() {
               </dd>
             </div>
           </dl>
+          <button className="btn btn-plain wide" aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)}>
+            {open === r.id ? t.hideDetails : t.details}
+          </button>
+          {open === r.id && <RideDetails ride={r} />}
         </Card>
       ))}
 

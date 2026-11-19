@@ -5,6 +5,7 @@ import { RideScreen } from './screens/RideScreen';
 import { RidesScreen } from './screens/RidesScreen';
 import { HelpScreen } from './screens/HelpScreen';
 import { closeDialog, DialogHost } from './ui/components';
+import { RideSummary } from './ui/RideSummary';
 import { IconHelp, IconList, IconRide } from './ui/icons';
 import { runChecks, tapFeedback, type Checks } from './native';
 import { initEngine } from './tracking/engine';
@@ -30,6 +31,7 @@ export function App() {
     const sub = CapApp.addListener('resume', recheck);
     const back = CapApp.addListener('backButton', () => {
       if (closeDialog()) return;
+      if (useStore.getState().summaryId) return useStore.getState().showSummary(null);
       if (useStore.getState().tab !== 'ride') useStore.getState().setTab('ride');
       else CapApp.minimizeApp();
     });
@@ -83,6 +85,7 @@ export function App() {
           </button>
         ))}
       </nav>
+      <RideSummary />
       <DialogHost />
     </div>
   );
