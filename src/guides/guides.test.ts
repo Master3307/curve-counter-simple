@@ -19,4 +19,13 @@ describe('guides', () => {
     }
     expect(guideFor('android').brand).toBe('android');
   });
+
+  it('every step with a button tells the user to tap that button (same word)', () => {
+    for (const g of GUIDES)
+      for (const st of g.steps) {
+        if (!st.action) continue;
+        expect(st.text.de).toContain('„Öffnen“');
+        expect(st.text.en).toContain('"Open"');
+      }
+  });
 });

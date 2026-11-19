@@ -32,6 +32,15 @@ vi.mock('@capacitor/filesystem', () => ({
   },
 }));
 
+const notes = vi.hoisted(() => [] as string[]);
+vi.mock('@capacitor/local-notifications', () => ({
+  LocalNotifications: {
+    schedule: async ({ notifications }: { notifications: { title: string }[] }) => void notes.push(...notifications.map((n) => n.title)),
+    requestPermissions: async () => ({ display: 'granted' }),
+    checkPermissions: async () => ({ display: 'granted' }),
+  },
+}));
+
 const ROUTE: Leg[] = [
   { kind: 'stop', seconds: 30 },
   { kind: 'straight', length: 500, speedKmh: 60 },
@@ -265,5 +274,53 @@ describe('engine', () => {
     e.useStore.getState().clearUndo();
     await settle();
     expect(files.has(`tracks/${id}.csv`)).toBe(false);
+  });
+
+  describe('reminders (plan 1.4) and "never fail silently"', () => {
+    beforeEach(() => {
+      notes.length = 0;
+    });
+
+    it('armed for 30 min without riding off: asks, then stops waiting', async () => {
+      const rec = fakeRecorder();
+      const e = await boot(rec);
+      await e.startRide();
+      await e.checkReminders(Date.now() + 29 * 60_000);
+      expect(e.useStore.getState().phase).toBe('armed');
+      await e.checkReminders(Date.now() + 31 * 60_000);
+      expect(e.useStore.getState().phase).toBe('off');
+      expect(rec.session).toBeNull();
+      expect(notes).toEqual(['Willst du noch fahren?']);
+    });
+
+    it('standing still for an hour during a manual ride: asks once, never ends the ride', async () => {
+      const rec = fakeRecorder();
+      const e = await boot(rec);
+      await e.startRide();
+      FIXES.forEach((f) => rec.push(f));
+      await e.pump();
+      const end = FIXES[FIXES.length - 1].t;
+      await e.checkReminders(end + 61 * 60_000);
+      await e.checkReminders(end + 62 * 60_000);
+      expect(notes).toEqual(['Fahrt vergessen zu beenden?']);
+      expect(e.useStore.getState().phase).toBe('riding');
+    });
+
+    it('no GPS for a minute is shown, and clears when fixes come back', async () => {
+      const rec = fakeRecorder();
+      const e = await boot(rec);
+      await e.startRide();
+      FIXES.slice(0, 40).forEach((f) => rec.push(f));
+      await e.pump();
+      const last = FIXES[39].t;
+      await e.checkReminders(last + 30_000);
+      expect(e.useStore.getState().live.noGps).toBe(false);
+      await e.checkReminders(last + 70_000);
+      expect(e.useStore.getState().live.noGps).toBe(true);
+      FIXES.slice(40, 41).forEach((f) => rec.push(f));
+      await e.pump();
+      await e.checkReminders(FIXES[40].t + 1000);
+      expect(e.useStore.getState().live.noGps).toBe(false);
+    });
   });
 });

@@ -50,6 +50,9 @@ let newCurves: Curve[] = [];
 /** totals of a ride that continues after its log was lost (web reload); added to the new stats */
 let base: Pick<Ride, 'distanceM' | 'movingS' | 'topSpeed'> | null = null;
 let lastNotify = { key: '', text: '', at: 0 };
+/** last fix at walking speed or faster (for "Forgot to stop?") */
+let lastMovingT: number | null = null;
+let remindedStop = false;
 
 const st = () => useStore.getState();
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -100,6 +103,10 @@ function derivedSpeed(a: Fix, b: Fix) {
 function onFix(fix: Fix, seq: number) {
   const speed = fix.speed ?? (lastFix ? derivedSpeed(lastFix, fix) : 0);
   lastFix = { ...fix, speed };
+  if (speed >= 5 / 3.6) {
+    lastMovingT = fix.t;
+    remindedStop = false;
+  }
   const session = st().session;
   if (!session) return;
 
@@ -213,6 +220,8 @@ function resetDetectors(mode: Session['mode']) {
   newCurves = [];
   base = null;
   lastNotify = { key: '', text: '', at: 0 };
+  lastMovingT = null;
+  remindedStop = false;
 }
 
 function subscribe() {
@@ -250,7 +259,7 @@ async function beginSession(mode: Session['mode']): Promise<boolean> {
   }
   cursor = 0;
   resetDetectors(mode);
-  st().setSession({ id, from: 0, mode });
+  st().setSession({ id, from: 0, mode, startedAt: Date.now() });
   st().setPhase(mode === 'manual' ? 'armed' : 'watching');
   subscribe();
   updateNotification(true);
@@ -352,7 +361,7 @@ export async function initEngine() {
     void pump();
     const ev = rideDetector.tick(Date.now());
     if (ev?.type === 'end' && st().phase === 'riding' && st().session?.mode === 'auto') finishAutoRide(ev.at, cursor);
-    // TODO(plan 1.4): armed > 30 min without moving → notification "Still want to ride?", then disarm
+    void checkReminders(Date.now());
     updateNotification();
   }, 5_000);
 
@@ -370,6 +379,50 @@ export async function initEngine() {
   if (Capacitor.isNativePlatform()) {
     CapApp.addListener('resume', () => void pump());
     CapApp.addListener('pause', () => void flushStorage());
+  }
+}
+
+const ARMED_TIMEOUT = 30 * 60_000;
+const FORGOT_STOP = 60 * 60_000;
+const NO_GPS = 60_000;
+
+async function remind(title: string, body: string) {
+  try {
+    await LocalNotifications.schedule({ notifications: [{ id: Math.floor(Math.random() * 1e6) + 10, title, body }] });
+  } catch {
+    /* notifications not allowed: the app shows it on screen anyway */
+  }
+}
+
+/**
+ * Plan 1.4 + Rule 1 "never fail silently": armed too long → ask and stop waiting; manual ride
+ * standing still for an hour → ask once (never ends it by itself); no GPS → say so.
+ * Exported for tests.
+ */
+export async function checkReminders(now: number) {
+  const s = st();
+  const session = s.session;
+  if (!session || source.kind === 'demo') {
+    if (s.live.noGps) s.setLive({ noGps: false });
+    return;
+  }
+  const t = STRINGS[s.settings.lang];
+  const lastT = lastFix?.t ?? session.startedAt ?? now;
+  const noGps = (s.phase === 'armed' || s.phase === 'riding') && now - lastT > NO_GPS;
+  if (noGps !== s.live.noGps) s.setLive({ noGps });
+
+  if (s.phase === 'armed' && session.mode === 'manual' && session.startedAt && now - session.startedAt > ARMED_TIMEOUT) {
+    await remind(t.remindArmedTitle, t.remindArmedText);
+    await stopRide();
+    return;
+  }
+  const ride = activeRide();
+  if (s.phase === 'riding' && session.mode === 'manual' && ride && !remindedStop) {
+    const since = lastMovingT ?? ride.startedAt;
+    if (now - since > FORGOT_STOP) {
+      remindedStop = true;
+      await remind(t.remindStopTitle, t.remindStopText);
+    }
   }
 }
 

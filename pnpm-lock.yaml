@@ -202,9 +202,6 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.4
         version: 8.0.4(@capacitor/core@8.6.2)
-      '@capawesome-team/capacitor-android-battery-optimization':
-        specifier: ^8.0.1
-        version: 8.0.1(@capacitor/core@8.6.2)
       '@fontsource/atkinson-hyperlegible-next':
         specifier: ^5.3.0
         version: 5.3.0
@@ -321,11 +318,6 @@ packages:
 
   '@capacitor/synapse@1.0.4':
     resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
-
-  '@capawesome-team/capacitor-android-battery-optimization@8.0.1':
-    resolution: {integrity: sha512-961KMUgiOOXxEY39/C5bcn+1NNVmEidgA9hUKzgciCt83jOh4WjN9YUWI1B/u4CFyHKMS0sLBjufD3IRfKBMrA==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
 
   '@emnapi/core@2.0.0-beta.2':
     resolution: {integrity: sha512-MzCVoWtcg4Pm2B3je5mMvYMvj3MmBKw+fU7vbsJc9/iT8ip6/eYIHo/Dsm/mr+wsHB6SEyJDuxB09Yy6r/8+4A==}
@@ -1604,10 +1596,6 @@ snapshots:
       '@capacitor/core': 8.6.2
 
   '@capacitor/synapse@1.0.4': {}
-
-  '@capawesome-team/capacitor-android-battery-optimization@8.0.1(@capacitor/core@8.6.2)':
-    dependencies:
-      '@capacitor/core': 8.6.2
 
   '@emnapi/core@2.0.0-beta.2':
     dependencies:

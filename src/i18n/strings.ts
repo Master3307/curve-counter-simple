@@ -29,6 +29,11 @@ const de = {
   safety: 'Augen auf die Straße. Die App zählt von allein – du musst nichts tun.',
   noLocation: 'Die App darf deinen Standort nicht sehen. Ohne Standort kann sie keine Kurven zählen.',
   gpsWeak: 'GPS schwach – Zählen kann ungenau sein',
+  noGps: 'Kein GPS-Empfang. Unter freiem Himmel kommt er meist schnell zurück.',
+  remindArmedTitle: 'Willst du noch fahren?',
+  remindArmedText: 'Die App hat 30 Minuten gewartet und wartet jetzt nicht mehr. Drück einfach wieder auf „Fahrt starten“.',
+  remindStopTitle: 'Fahrt vergessen zu beenden?',
+  remindStopText: 'Du stehst seit einer Stunde. Öffne die App und tippe auf „Fahrt beenden“.',
 
   // rides
   noRides: 'Noch keine Fahrten. Fahr los – die App zählt mit.',
@@ -54,9 +59,12 @@ const de = {
   // help / check
   checkTitle: 'Ist alles richtig eingestellt?',
   checkHint: 'Alles grün = die App zählt auch, wenn das Handy in der Tasche ist.',
-  checkLocation: 'Standort „Immer erlauben“',
+  checkLocation: 'Standort: „Immer zulassen“',
+  checkLocationWhy: 'Damit die App auch zählt, wenn das Handy in der Tasche ist.',
   checkNotifications: 'Mitteilungen erlaubt',
-  checkBattery: 'Akku-Sparen blockiert die App nicht',
+  checkNotificationsWhy: 'Damit du siehst, dass die Fahrt läuft.',
+  checkBattery: 'Akku-Sparen stoppt die App nicht',
+  checkBatteryWhy: 'Sonst stoppt das Handy die App nach ein paar Minuten.',
   checkUnknown: 'Bitte einmal prüfen',
   fix: 'Beheben',
   allGood: 'Alles bestens! ✓',
@@ -65,8 +73,8 @@ const de = {
   otherPhone: 'Anderes Handy?',
   pickPhone: 'Welches Handy hast du?',
   step: 'Schritt',
-  openIt: 'Hier tippen',
-  done: 'Fertig',
+  openIt: 'Öffnen',
+  done: 'Erledigt',
 
   // settings
   settings: 'Einstellungen',
@@ -161,6 +169,11 @@ const en: Strings = {
   safety: 'Eyes on the road. The app counts by itself – you don’t have to do anything.',
   noLocation: "The app isn't allowed to see your location. Without it, it can't count curves.",
   gpsWeak: 'GPS weak – counting may be off',
+  noGps: 'No GPS signal. Under open sky it usually comes back quickly.',
+  remindArmedTitle: 'Still want to ride?',
+  remindArmedText: 'The app waited 30 minutes and has stopped waiting. Just press "Start ride" again.',
+  remindStopTitle: 'Forgot to stop your ride?',
+  remindStopText: 'You have been standing still for an hour. Open the app and tap "Stop ride".',
 
   noRides: 'No rides yet. Just ride – the app counts along.',
   allRides: 'All rides together',
@@ -184,9 +197,12 @@ const en: Strings = {
 
   checkTitle: 'Is everything set up right?',
   checkHint: 'All green = the app counts even with the phone in your pocket.',
-  checkLocation: 'Location "Allow all the time"',
+  checkLocation: 'Location: "Allow all the time"',
+  checkLocationWhy: 'So the app keeps counting with the phone in your pocket.',
   checkNotifications: 'Notifications allowed',
-  checkBattery: 'Battery saver does not block the app',
+  checkNotificationsWhy: 'So you can see that the ride is running.',
+  checkBattery: 'Battery saver does not stop the app',
+  checkBatteryWhy: 'Otherwise the phone stops the app after a few minutes.',
   checkUnknown: 'Please check once',
   fix: 'Fix',
   allGood: 'All good! ✓',
@@ -195,7 +211,7 @@ const en: Strings = {
   otherPhone: 'Different phone?',
   pickPhone: 'Which phone do you have?',
   step: 'Step',
-  openIt: 'Tap here',
+  openIt: 'Open',
   done: 'Done',
 
   settings: 'Settings',

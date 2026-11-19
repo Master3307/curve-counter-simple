@@ -109,10 +109,13 @@ interface Open {
   total: number;
   /** opposite-direction turning since the last same-direction step (held back) */
   pending: number;
+  /** where that held-back turning happened, [distance, turn] – starts the next curve of an S-bend */
+  pendingSteps: [number, number][];
   t: number;
   /** where the turning started (window start), m */
   startD: number;
-  speeds: number[];
+  /** [distance, speed] of every sample while the curve is open */
+  speeds: [number, number][];
   quiet: number;
   apex: Sample;
   apexTurn: number;
@@ -121,10 +124,10 @@ interface Open {
 }
 
 /**
- * Length of the turning part: distance over which the accumulated turn goes from 10 % to 90 %
- * of the total, scaled to 100 %. Robust against the window smearing the start and end.
+ * Where the turning really happens: distances at which the accumulated turn reaches 10 % and
+ * 90 % of the total. Robust against the window smearing the start and end.
  */
-function turningLength(trace: [number, number][], total: number): number {
+function turningRange(trace: [number, number][], total: number): [number, number] {
   const at = (frac: number) => {
     const target = Math.abs(total) * frac;
     for (let i = 1; i < trace.length; i++) {
@@ -136,7 +139,7 @@ function turningLength(trace: [number, number][], total: number): number {
     }
     return trace[trace.length - 1][0];
   };
-  return (at(0.9) - at(0.1)) / 0.8;
+  return [at(0.1), at(0.9)];
 }
 
 /** A closed candidate, before the angle / speed rules are applied. */
@@ -184,10 +187,11 @@ class Pass {
 
     if (wDir !== cur.dir && Math.abs(w) >= this.enter) {
       // S-bend: close this one, the opposite curve starts right away with the opposite
-      // turning that was held back
+      // turning that was held back (at the places where it happened)
+      const steps: [number, number][] = [...cur.pendingSteps, [s.d, turn]];
       const carried = cur.pending + turn;
       this.closeInto(s, out);
-      this.start(s, carried, wDir, s.d, false);
+      this.start(s, carried, wDir, steps[0][0] - this.step, false, steps);
       return;
     }
 
@@ -195,11 +199,13 @@ class Pass {
     if (same) {
       cur.total += cur.pending + turn;
       cur.pending = 0;
+      cur.pendingSteps = [];
       cur.trace.push([s.d, cur.total]);
     } else {
       cur.pending += turn;
+      cur.pendingSteps.push([s.d, turn]);
     }
-    cur.speeds.push(s.speed);
+    cur.speeds.push([s.d, s.speed]);
     if (Math.abs(turn) > cur.apexTurn) {
       cur.apexTurn = Math.abs(turn);
       cur.apex = s;
@@ -218,20 +224,26 @@ class Pass {
     this.reset();
   }
 
-  /** `fromWindow`: the opening turning `w` is the whole window (else carried over from an S-bend). */
-  private start(s: Sample, w: number, dir: Dir, startD: number, fromWindow: boolean) {
-    // the turning already in the window, step by step (not as one lump at the end)
+  /**
+   * `fromWindow`: the opening turning `w` is the whole window; otherwise it was carried over from
+   * an S-bend and `carriedSteps` says where it happened.
+   */
+  private start(s: Sample, w: number, dir: Dir, startD: number, fromWindow: boolean, carriedSteps: [number, number][] = []) {
+    // the turning that opened the curve, step by step (not as one lump at the end)
     const trace: [number, number][] = [[startD, 0]];
+    let acc = 0;
     if (fromWindow) {
-      let acc = 0;
       this.win.forEach((x, i) => {
         acc += x;
         trace.push([s.d - (this.win.length - 1 - i) * this.step, acc]);
       });
     } else {
-      trace.push([s.d, w]);
+      for (const [d, x] of carriedSteps) {
+        acc += x;
+        trace.push([d, acc]);
+      }
     }
-    this.open = { dir, total: w, pending: 0, t: s.t, startD, speeds: [s.speed], quiet: 0, apex: s, apexTurn: 0, trace };
+    this.open = { dir, total: w, pending: 0, pendingSteps: [], t: s.t, startD, speeds: [[s.d, s.speed]], quiet: 0, apex: s, apexTurn: 0, trace };
   }
 
   private closeInto(s: Sample, out: Closed[]) {
@@ -245,7 +257,7 @@ export class CurveDetector {
   private o: CurveOptions;
   private last: Fix | null = null;
   /** last few accepted positions, for light smoothing */
-  private recent: { lat: number; lon: number }[] = [];
+  private recent: { lat: number; lon: number; speed: number }[] = [];
   private prevPos: { lat: number; lon: number } | null = null;
   private carry = 0;
   private dist = 0;
@@ -284,12 +296,14 @@ export class CurveDetector {
     this.last = fix;
 
     // light smoothing: average of the last 3 positions
-    this.recent.push({ lat: fix.lat, lon: fix.lon });
+    this.recent.push({ lat: fix.lat, lon: fix.lon, speed });
     if (this.recent.length > 3) this.recent.shift();
     const pos = {
       lat: this.recent.reduce((s, p) => s + p.lat, 0) / this.recent.length,
       lon: this.recent.reduce((s, p) => s + p.lon, 0) / this.recent.length,
     };
+    // speed averaged the same way, so it belongs to the (smoothed) position
+    speed = this.recent.reduce((s, p) => s + p.speed, 0) / this.recent.length;
 
     if (!this.prevPos) {
       this.prevPos = pos;
@@ -395,21 +409,25 @@ export class CurveDetector {
     const angle = Math.abs(c.total);
     const totalDir: Dir = c.total >= 0 ? 'R' : 'L';
     if (totalDir !== c.dir || angle < MIN_ANGLE[this.o.sensitivity]) return null;
-    const avg = c.speeds.reduce((a, b) => a + b, 0) / c.speeds.length;
-    const min = Math.min(...c.speeds);
+    // speeds only from where the turning happens (not the straight in the window's tail)
+    const [d10, d90] = turningRange(c.trace, c.total);
+    let inCurve = c.speeds.filter(([d]) => d >= d10 - this.o.step && d <= d90 + this.o.step).map(([, v]) => v);
+    if (!inCurve.length) inCurve = c.speeds.map(([, v]) => v);
+    const avg = inCurve.reduce((a, b) => a + b, 0) / inCurve.length;
+    const min = Math.min(...inCurve);
     if (min < this.o.minApexSpeed) return null;
     const curve: Curve = {
       t: c.t,
       dir: c.dir,
       angle: Math.round(angle),
-      entrySpeed: c.speeds[0],
+      entrySpeed: inCurve[0],
       minSpeed: min,
       avgSpeed: avg,
-      exitSpeed: c.speeds[c.speeds.length - 1],
+      exitSpeed: inCurve[inCurve.length - 1],
       lat: c.apex.lat,
       lon: c.apex.lon,
       endT: end.t,
-      lengthM: Math.max(this.o.step, Math.round(turningLength(c.trace, c.total))),
+      lengthM: Math.max(this.o.step, Math.round((d90 - d10) / 0.8)),
     };
     if (wide) curve.wide = true;
     return curve;

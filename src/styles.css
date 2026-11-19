@@ -782,3 +782,15 @@ small {
   opacity: 0.6;
   pointer-events: none;
 }
+.all-good {
+  margin: 0.4rem 0 0;
+  font-weight: 800;
+  color: var(--go);
+}
+.step-done p {
+  color: var(--muted);
+}
+.step-done .step-num {
+  background: var(--go);
+  color: var(--go-ink);
+}

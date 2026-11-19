@@ -20,7 +20,7 @@ export type Brand =
   | 'android'
   | 'iphone';
 
-/** What a step's button does. Vendor keys are opened by the native plugin later. */
+/** What a step's button does (native: SetupPlugin.open). */
 export type Action =
   | 'locationAlways'
   | 'notifications'
@@ -36,6 +36,8 @@ export type Action =
 export interface Step {
   text: Record<Lang, string>;
   action?: Action;
+  /** the traffic light this step fixes – the step shows ✓ once it is green */
+  check?: 'location' | 'notifications' | 'battery';
 }
 
 export interface Guide {
@@ -44,28 +46,37 @@ export interface Guide {
   steps: Step[];
 }
 
-/** First steps every Android phone needs. */
+/**
+ * Writing rules for every step (Rule 2):
+ * - one thing per step, short sentences, the words the phone really shows in „quotes“
+ * - start with the button: „Tippe auf Öffnen.“ – the button below the text says exactly that
+ * - say what to pick on the page that opens, nothing else
+ */
+
+/** Steps every Android phone needs. `check` = the matching traffic light (step shows ✓ when green). */
 const ANDROID_BASE: Step[] = [
   {
     text: {
-      de: 'Tippe auf den Knopf. Wähle „Immer zulassen“.',
-      en: 'Tap the button. Choose "Allow all the time".',
+      de: 'Standort: Tippe auf „Öffnen“. Wähle „Immer zulassen“.',
+      en: 'Location: Tap "Open". Choose "Allow all the time".',
     },
     action: 'locationAlways',
+    check: 'location',
   },
   {
     text: {
-      de: 'Tippe auf den Knopf. Tippe auf „Zulassen“.',
-      en: 'Tap the button. Tap "Allow".',
+      de: 'Akku: Tippe auf „Öffnen“. Tippe auf „Zulassen“.',
+      en: 'Battery: Tap "Open". Tap "Allow".',
     },
     action: 'batteryUnrestricted',
+    check: 'battery',
   },
 ];
 
 const lockInRecents: Step = {
   text: {
-    de: 'Öffne die zuletzt benutzten Apps. Halte die App „Simple Curve Counter“ gedrückt und tippe auf das Schloss 🔒.',
-    en: 'Open your recent apps. Press and hold Simple Curve Counter and tap the lock 🔒.',
+    de: 'Wische vom unteren Rand nach oben und halte kurz. Halte die App gedrückt. Tippe auf das Schloss 🔒.',
+    en: 'Swipe up from the bottom and hold. Press and hold the app. Tap the lock 🔒.',
   },
 };
 
@@ -77,8 +88,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „Nie in Standby versetzte Apps“ → „+“ → Simple Curve Counter.',
-          en: 'Tap the button → "Never sleeping apps" → "+" → Simple Curve Counter.',
+          de: 'Samsung: Tippe auf „Öffnen“. Dann „Nie in Standby versetzte Apps“ → „+“ → „Simple Curve Counter“.',
+          en: 'Samsung: Tap "Open". Then "Never sleeping apps" → "+" → "Simple Curve Counter".',
         },
         action: 'samsungNeverSleeping',
       },
@@ -91,8 +102,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf. Schalte „Autostart“ für Simple Curve Counter EIN. Dann: App in den letzten Apps mit dem Schloss 🔒 sichern.',
-          en: 'Tap the button. Switch "Autostart" ON for Simple Curve Counter. Then lock the app 🔒 in your recent apps.',
+          de: 'Autostart: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ EIN.',
+          en: 'Autostart: Tap "Open". Switch "Simple Curve Counter" ON.',
         },
         action: 'xiaomiAutostart',
       },
@@ -105,8 +116,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „App-Start“. Simple Curve Counter AUS schalten, dann im Fenster alle 3 Schalter EIN.',
-          en: 'Tap the button → "App launch". Switch Simple Curve Counter OFF, then switch all 3 options ON in the window.',
+          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ AUS. Im Fenster dann alle 3 Schalter EIN.',
+          en: 'App launch: Tap "Open". Switch "Simple Curve Counter" OFF. Then switch all 3 options ON in the window.',
         },
         action: 'huaweiAppLaunch',
       },
@@ -119,8 +130,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „App-Start“. Simple Curve Counter AUS schalten, dann im Fenster alle 3 Schalter EIN.',
-          en: 'Tap the button → "App launch". Switch Simple Curve Counter OFF, then switch all 3 options ON in the window.',
+          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ AUS. Im Fenster dann alle 3 Schalter EIN.',
+          en: 'App launch: Tap "Open". Switch "Simple Curve Counter" OFF. Then switch all 3 options ON in the window.',
         },
         action: 'honorAppLaunch',
       },
@@ -134,8 +145,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf. Schalte „Autostart erlauben“ und „Hintergrundaktivität erlauben“ EIN.',
-          en: 'Tap the button. Switch "Allow auto launch" and "Allow background activity" ON.',
+          de: 'Autostart: Tippe auf „Öffnen“. Schalte „Autostart erlauben“ und „Hintergrundaktivität erlauben“ EIN.',
+          en: 'Autostart: Tap "Open". Switch "Allow auto launch" and "Allow background activity" ON.',
         },
         action: 'oppoAutostart',
       },
@@ -148,8 +159,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf. Schalte „Hohen Akkuverbrauch im Hintergrund erlauben“ EIN.',
-          en: 'Tap the button. Switch "Allow high background power consumption" ON.',
+          de: 'Hintergrund: Tippe auf „Öffnen“. Schalte „Hohen Akkuverbrauch im Hintergrund erlauben“ EIN.',
+          en: 'Background: Tap "Open". Switch "Allow high background power consumption" ON.',
         },
         action: 'vivoBackground',
       },
@@ -164,8 +175,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Schalte vor langen Fahrten den „STAMINA-Modus“ aus (Einstellungen → Akku).',
-          en: 'Before long rides, switch "STAMINA mode" off (Settings → Battery).',
+          de: 'Vor langen Fahrten: „STAMINA-Modus“ ausschalten. Du findest ihn unter Einstellungen → Akku.',
+          en: 'Before long rides: switch "STAMINA mode" off. You find it in Settings → Battery.',
         },
       },
     ],
@@ -178,8 +189,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „Akku“ → wähle „Nicht eingeschränkt“.',
-          en: 'Tap the button → "Battery" → choose "Unrestricted".',
+          de: 'Falls es trotzdem stoppt: Tippe auf „Öffnen“ → „Akku“ → „Nicht eingeschränkt“.',
+          en: 'If it still stops: Tap "Open" → "Battery" → "Unrestricted".',
         },
         action: 'appSettings',
       },
@@ -191,22 +202,23 @@ export const GUIDES: Guide[] = [
     steps: [
       {
         text: {
-          de: 'Tippe auf den Knopf → „Standort“ → wähle „Immer“ und schalte „Genauer Standort“ EIN.',
-          en: 'Tap the button → "Location" → choose "Always" and switch "Precise Location" ON.',
+          de: 'Standort: Tippe auf „Öffnen“ → „Standort“. Wähle „Immer“. Schalte „Genauer Standort“ EIN.',
+          en: 'Location: Tap "Open" → "Location". Choose "Always". Switch "Precise Location" ON.',
+        },
+        action: 'appSettings',
+        check: 'location',
+      },
+      {
+        text: {
+          de: 'Hintergrund: Tippe auf „Öffnen“. Schalte „Hintergrundaktualisierung“ EIN.',
+          en: 'Background: Tap "Open". Switch "Background App Refresh" ON.',
         },
         action: 'appSettings',
       },
       {
         text: {
-          de: 'Auf derselben Seite: „Hintergrundaktualisierung“ EIN.',
-          en: 'On the same page: switch "Background App Refresh" ON.',
-        },
-        action: 'appSettings',
-      },
-      {
-        text: {
-          de: 'Wichtig: App während der Fahrt NICHT wegwischen. Stromsparmodus bei langen Fahrten aus.',
-          en: "Important: DON'T swipe the app away while riding. Turn Low Power Mode off on long rides.",
+          de: 'Während der Fahrt: App NICHT wegwischen. Bei langen Fahrten den Stromsparmodus aus.',
+          en: "While riding: DON'T swipe the app away. On long rides, turn Low Power Mode off.",
         },
       },
     ],

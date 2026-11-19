@@ -25,11 +25,13 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
     onRecheck();
   };
 
-  const rows: { key: keyof Checks; label: string; action: Action; hide?: boolean }[] = [
-    { key: 'location', label: t.checkLocation, action: 'locationAlways' },
-    { key: 'notifications', label: t.checkNotifications, action: 'notifications' },
-    { key: 'battery', label: t.checkBattery, action: 'batteryUnrestricted', hide: platform === 'ios' },
+  const rows: { key: keyof Checks; label: string; why: string; action: Action; hide?: boolean }[] = [
+    { key: 'location', label: t.checkLocation, why: t.checkLocationWhy, action: 'locationAlways' },
+    { key: 'notifications', label: t.checkNotifications, why: t.checkNotificationsWhy, action: 'notifications' },
+    { key: 'battery', label: t.checkBattery, why: t.checkBatteryWhy, action: 'batteryUnrestricted', hide: platform === 'ios' },
   ];
+  const visible = rows.filter((r) => !r.hide);
+  const allOk = visible.every((r) => checks[r.key] === 'ok');
 
   const onDeleteAll = async () => {
     if (!(await confirm(t.deleteAllConfirm, t.deleteAll, t.cancel, true))) return;
@@ -42,31 +44,37 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
       <h1>{t.checkTitle}</h1>
       <p className="hint">{t.checkHint}</p>
       <Card>
-        {rows
-          .filter((r) => !r.hide)
-          .map((r) => (
-            <CheckRow key={r.key} state={checks[r.key]} label={r.label} fix={t.fix} unknown={t.checkUnknown} onFix={() => act(r.action)} />
-          ))}
+        {visible.map((r) => (
+          <CheckRow key={r.key} state={checks[r.key]} label={r.label} why={r.why} fix={t.fix} unknown={t.checkUnknown} onFix={() => act(r.action)} />
+        ))}
+        {allOk && <p className="all-good">{t.allGood}</p>}
       </Card>
 
       <h2>{t.guideFor(guide.name)}</h2>
       <Card>
         <ol className="steps">
-          {guide.steps.map((step, i) => (
-            <li key={i}>
-              <span className="step-num" aria-label={`${t.step} ${i + 1}`}>
-                {i + 1}
-              </span>
-              <div>
-                <p>{step.text[s.lang]}</p>
-                {step.action && (
-                  <button className="btn btn-small btn-go" onClick={() => act(step.action!)}>
-                    {t.openIt}
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
+          {guide.steps.map((step, i) => {
+            const done = step.check != null && checks[step.check] === 'ok';
+            return (
+              <li key={i} className={done ? 'step-done' : ''}>
+                <span className="step-num" aria-label={`${t.step} ${i + 1}${done ? ` – ${t.done}` : ''}`}>
+                  {done ? '✓' : i + 1}
+                </span>
+                <div>
+                  <p>{step.text[s.lang]}</p>
+                  {done ? (
+                    <span className="hint">{t.done}</span>
+                  ) : (
+                    step.action && (
+                      <button className="btn btn-small btn-go" onClick={() => act(step.action!)}>
+                        {t.openIt}
+                      </button>
+                    )
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ol>
         <button className="btn btn-link" onClick={() => setPicking(!picking)}>
           {t.otherPhone}
@@ -168,13 +176,27 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
   );
 }
 
-function CheckRow({ state, label, fix, unknown, onFix }: { state: CheckState; label: string; fix: string; unknown: string; onFix: () => void }) {
+function CheckRow({
+  state,
+  label,
+  why,
+  fix,
+  unknown,
+  onFix,
+}: {
+  state: CheckState;
+  label: string;
+  why: string;
+  fix: string;
+  unknown: string;
+  onFix: () => void;
+}) {
   return (
     <div className={`check check-${state}`}>
       <span className="check-icon">{state === 'ok' ? <IconCheck /> : <IconAlert />}</span>
       <span className="check-label">
         {label}
-        {state === 'unknown' && <span className="hint">{unknown}</span>}
+        {state !== 'ok' && <span className="hint">{state === 'unknown' ? unknown : why}</span>}
       </span>
       {state !== 'ok' && (
         <button className="btn btn-small btn-go" onClick={onFix}>

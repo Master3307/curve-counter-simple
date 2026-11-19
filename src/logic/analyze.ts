@@ -14,9 +14,10 @@ import { RideStats } from './rideStats';
 /**
  * Bump when the detector changes in a way that changes counts: saved rides with a track are
  * then recounted on the next app start.
- * 1 = v0.1/0.2 · 2 = wide-sweeper pass + curve length
+ * 1 = v0.1/0.2 · 2 = wide-sweeper pass + curve length · 3 = curve speeds from the turning part,
+ * S-bend length fix
  */
-export const ALGO_VERSION = 2;
+export const ALGO_VERSION = 3;
 
 export interface Analysis {
   curves: Curve[];

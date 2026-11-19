@@ -64,7 +64,13 @@ export function RideScreen({ problems }: { problems: number }) {
           <b>{t.fixBannerButton} →</b>
         </button>
       )}
-      {live.gpsWeak && phase !== 'off' && (
+      {live.noGps && phase !== 'off' && (
+        <div className="fix-banner" role="alert">
+          <IconAlert />
+          <span>{t.noGps}</span>
+        </div>
+      )}
+      {!live.noGps && live.gpsWeak && phase !== 'off' && (
         <div className="fix-banner" role="alert">
           <IconAlert />
           <span>{t.gpsWeak}</span>

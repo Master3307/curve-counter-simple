@@ -59,4 +59,30 @@ describe('curve metrics', () => {
     expect(s.avgCurveSpeed.L).not.toBeNull();
     expect(summarizeCurves(curves, 500).per100km).toBeNull();
   });
+
+  it('regression (emulator ride 2026-11-19): S-bend and hairpin get the right size and speed', () => {
+    const d = new CurveDetector();
+    const fixes = simulate(
+      [
+        { kind: 'straight', length: 250, speedKmh: 60 },
+        { kind: 'arc', radius: 60, angle: -90, speedKmh: 50 },
+        { kind: 'arc', radius: 60, angle: 80, speedKmh: 50 },
+        { kind: 'straight', length: 300, speedKmh: 70 },
+        { kind: 'arc', radius: 25, angle: -150, speedKmh: 25 },
+        { kind: 'straight', length: 300, speedKmh: 60 },
+      ],
+      { noise: 1, seed: 3 },
+    );
+    const c = [...fixes.flatMap((f) => d.push(f)), ...d.flush()];
+    expect(c.map((x) => x.dir).join('')).toBe('LRL');
+    const [, sBend, hairpin] = c.map((x) => ({ c: x, m: curveMetrics(x) }));
+    // second half of the S-bend: r = 60 m (was 18 m because the carried turning was lumped)
+    expect(Math.abs(sBend.m.radiusM! - 60) / 60).toBeLessThan(0.25);
+    expect(sBend.m.leanDeg).not.toBeNull();
+    // speeds from the curve itself, not from the straight after it (was 69 / 51 km/h)
+    expect(sBend.c.avgSpeed * 3.6).toBeLessThan(50 * 1.2);
+    expect(hairpin.c.avgSpeed * 3.6).toBeLessThan(25 * 1.15);
+    const trueLean = (Math.atan((25 / 3.6) ** 2 / (25 * 9.81)) * 180) / Math.PI;
+    expect(Math.abs(hairpin.m.leanDeg! - trueLean)).toBeLessThan(4);
+  });
 });

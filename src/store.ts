@@ -68,6 +68,8 @@ export interface Session {
   from: number;
   /** what started it: the Start button (manual) or the experimental auto mode */
   mode: 'manual' | 'auto';
+  /** when recording started (epoch ms; missing in v0.2 sessions) */
+  startedAt?: number;
 }
 
 export interface Live {
@@ -77,6 +79,8 @@ export interface Live {
   demo: boolean;
   /** shown on the ride screen in plain words, never silently ignored */
   problem: 'noLocation' | null;
+  /** no GPS fix for a while although recording */
+  noGps: boolean;
 }
 
 interface State {
@@ -168,7 +172,7 @@ export const useStore = create<State>()(
       session: null,
       settings: DEFAULT_SETTINGS,
       tab: 'ride',
-      live: { speed: 0, gpsWeak: false, demo: false, problem: null },
+      live: { speed: 0, gpsWeak: false, demo: false, problem: null, noGps: false },
       lastDeleted: null,
       summaryId: null,
       hydrated: false,
