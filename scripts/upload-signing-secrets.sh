@@ -2,18 +2,18 @@
 # Uploads the local Android release signing key to GitHub Actions secrets so CI-built
 # APKs carry the same signature as local builds (required for app updates).
 # Create a key once:
-#   keytool -genkeypair -v -keystore android/curvetracker-release.jks -alias curvetracker \
+#   keytool -genkeypair -v -keystore android/simplecurvecounter-release.jks -alias simplecurvecounter \
 #     -keyalg RSA -keysize 4096 -validity 10000
 # and android/keystore.properties:
-#   storeFile=curvetracker-release.jks
-#   storePassword=…  keyAlias=curvetracker  keyPassword=…
+#   storeFile=simplecurvecounter-release.jks
+#   storePassword=…  keyAlias=simplecurvecounter  keyPassword=…
 set -euo pipefail
 cd "$(dirname "$0")/../android"
 
-[ -f curvetracker-release.jks ] && [ -f keystore.properties ] || { echo "Keystore files missing in android/"; exit 1; }
+[ -f simplecurvecounter-release.jks ] && [ -f keystore.properties ] || { echo "Keystore files missing in android/"; exit 1; }
 prop() { grep "^$1=" keystore.properties | cut -d= -f2-; }
 
-base64 -w0 curvetracker-release.jks | gh secret set SCT_KEYSTORE_BASE64
+base64 -w0 simplecurvecounter-release.jks | gh secret set SCT_KEYSTORE_BASE64
 printf %s "$(prop storePassword)" | gh secret set SCT_KEYSTORE_PASSWORD
 printf %s "$(prop keyPassword)" | gh secret set SCT_KEY_PASSWORD
 printf %s "$(prop keyAlias)" | gh secret set SCT_KEY_ALIAS

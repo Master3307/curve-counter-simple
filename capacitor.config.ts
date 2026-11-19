@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.korbi.curvetracker',
-  appName: 'Curve Tracker',
+  appId: 'com.korbi.simplecurvecounter',
+  appName: 'Simple Curve Counter',
   webDir: 'dist',
   backgroundColor: '#14161a',
   android: {

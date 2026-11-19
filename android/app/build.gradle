@@ -18,10 +18,10 @@ def releaseStoreFile = signValue('storeFile', 'SCT_KEYSTORE_FILE')
 def hasReleaseSigning = releaseStoreFile && file(releaseStoreFile).exists()
 
 android {
-    namespace = "com.korbi.curvetracker"
+    namespace = "com.korbi.simplecurvecounter"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.korbi.curvetracker"
+        applicationId "com.korbi.simplecurvecounter"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode

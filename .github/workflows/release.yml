@@ -50,10 +50,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: dist-apk/CurveTracker-v*.apk
+          path: dist-apk/SimpleCurveCounter-v*.apk
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist-apk/CurveTracker-v*.apk --title "Curve Tracker $GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist-apk/SimpleCurveCounter-v*.apk --title "Simple Curve Counter $GITHUB_REF_NAME" --generate-notes

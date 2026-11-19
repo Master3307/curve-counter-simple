@@ -64,8 +64,8 @@ const ANDROID_BASE: Step[] = [
 
 const lockInRecents: Step = {
   text: {
-    de: 'Öffne die zuletzt benutzten Apps. Halte die Kurvenzähler-App gedrückt und tippe auf das Schloss 🔒.',
-    en: 'Open your recent apps. Press and hold Curve Tracker and tap the lock 🔒.',
+    de: 'Öffne die zuletzt benutzten Apps. Halte die App „Simple Curve Counter“ gedrückt und tippe auf das Schloss 🔒.',
+    en: 'Open your recent apps. Press and hold Simple Curve Counter and tap the lock 🔒.',
   },
 };
 
@@ -77,8 +77,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „Nie in Standby versetzte Apps“ → „+“ → Kurvenzähler.',
-          en: 'Tap the button → "Never sleeping apps" → "+" → Curve Tracker.',
+          de: 'Tippe auf den Knopf → „Nie in Standby versetzte Apps“ → „+“ → Simple Curve Counter.',
+          en: 'Tap the button → "Never sleeping apps" → "+" → Simple Curve Counter.',
         },
         action: 'samsungNeverSleeping',
       },
@@ -91,8 +91,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf. Schalte „Autostart“ für Kurvenzähler EIN. Dann: App in den letzten Apps mit dem Schloss 🔒 sichern.',
-          en: 'Tap the button. Switch "Autostart" ON for Curve Tracker. Then lock the app 🔒 in your recent apps.',
+          de: 'Tippe auf den Knopf. Schalte „Autostart“ für Simple Curve Counter EIN. Dann: App in den letzten Apps mit dem Schloss 🔒 sichern.',
+          en: 'Tap the button. Switch "Autostart" ON for Simple Curve Counter. Then lock the app 🔒 in your recent apps.',
         },
         action: 'xiaomiAutostart',
       },
@@ -105,8 +105,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „App-Start“. Kurvenzähler AUS schalten, dann im Fenster alle 3 Schalter EIN.',
-          en: 'Tap the button → "App launch". Switch Curve Tracker OFF, then switch all 3 options ON in the window.',
+          de: 'Tippe auf den Knopf → „App-Start“. Simple Curve Counter AUS schalten, dann im Fenster alle 3 Schalter EIN.',
+          en: 'Tap the button → "App launch". Switch Simple Curve Counter OFF, then switch all 3 options ON in the window.',
         },
         action: 'huaweiAppLaunch',
       },
@@ -119,8 +119,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Tippe auf den Knopf → „App-Start“. Kurvenzähler AUS schalten, dann im Fenster alle 3 Schalter EIN.',
-          en: 'Tap the button → "App launch". Switch Curve Tracker OFF, then switch all 3 options ON in the window.',
+          de: 'Tippe auf den Knopf → „App-Start“. Simple Curve Counter AUS schalten, dann im Fenster alle 3 Schalter EIN.',
+          en: 'Tap the button → "App launch". Switch Simple Curve Counter OFF, then switch all 3 options ON in the window.',
         },
         action: 'honorAppLaunch',
       },

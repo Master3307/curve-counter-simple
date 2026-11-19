@@ -1,7 +1,7 @@
 export type Lang = 'de' | 'en';
 
 const de = {
-  appName: 'Kurvenzähler',
+  appName: 'Simple Curve Counter',
   tabRide: 'Fahrt',
   tabRides: 'Meine Fahrten',
   tabHelp: 'Hilfe',
@@ -97,7 +97,7 @@ const de = {
 export type Strings = typeof de;
 
 const en: Strings = {
-  appName: 'Curve Tracker',
+  appName: 'Simple Curve Counter',
   tabRide: 'Ride',
   tabRides: 'My rides',
   tabHelp: 'Help',

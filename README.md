@@ -1,4 +1,4 @@
-# Curve Tracker · Kurvenzähler
+# Simple Curve Counter
 
 A dead-simple motorcycle app (German / English) that counts your **left curves, right curves
 and the total** for every ride, along with ride time, distance and speed.
@@ -6,7 +6,7 @@ Made to be understood by anyone: big numbers, big buttons, plain words.
 
 > **Status: early placeholder (v0.1).** The UI, the curve/ride detection logic (with tests) and
 > the build pipelines are in place. Counting **in the background** needs the native
-> `CurveTracker` plugin, which isn't written yet. Until then the app counts while it's open.
+> `SimpleCurveCounter` plugin, which isn't written yet. Until then the app counts while it's open.
 
 ## How it works
 
@@ -54,7 +54,7 @@ for the APK, macOS + Xcode for iOS.
 pnpm install
 pnpm dev          # run in the browser (Help → "Simulate a test ride" plays a fake ride)
 pnpm test         # unit tests (curve + ride detection, guides, formatting)
-pnpm apk          # build release APK → dist-apk/CurveTracker-vX.Y.Z.apk
+pnpm apk          # build release APK → dist-apk/SimpleCurveCounter-vX.Y.Z.apk
 pnpm apk:install  # install on a connected phone / emulator via adb
 pnpm sync:ios && pnpm ios:open   # open the iOS project in Xcode (macOS)
 ```
@@ -84,7 +84,7 @@ android/ ios/   Capacitor native projects
 ### Android signing
 
 Release APKs must always be signed with the **same key**, otherwise Android refuses updates.
-Create `android/curvetracker-release.jks` + `android/keystore.properties` (both gitignored, see
+Create `android/simplecurvecounter-release.jks` + `android/keystore.properties` (both gitignored, see
 `scripts/upload-signing-secrets.sh`), back them up, then run the script to upload the
 `SCT_KEYSTORE_BASE64`, `SCT_KEYSTORE_PASSWORD`, `SCT_KEY_ALIAS`, `SCT_KEY_PASSWORD` secrets.
 Without a key the APK is debug-signed (installs, but can't update a release build).
@@ -92,7 +92,7 @@ Without a key the APK is debug-signed (installs, but can't update a release buil
 ### TestFlight
 
 Needs a paid Apple Developer account and the app created in App Store Connect with bundle ID
-`com.korbi.curvetracker`. Create an App Store Connect API key (role *App Manager*) and set the
+`com.korbi.simplecurvecounter`. Create an App Store Connect API key (role *App Manager*) and set the
 repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the `.p8` file, base64) and
 `APPLE_TEAM_ID`. Without them the workflow only checks that the iOS app compiles.
 
@@ -106,7 +106,7 @@ Placeholder: `assets/src/icon.svg` (yellow curve sign). Export `assets/icon-only
 
 ## Kurz auf Deutsch
 
-**Kurvenzähler** zählt beim Motorradfahren deine **Links-** und **Rechtskurven** und alle
+**Simple Curve Counter** zählt beim Motorradfahren deine **Links-** und **Rechtskurven** und alle
 Kurven zusammen, pro Fahrt, dazu Fahrzeit, Strecke und Tempo. *Fahrt starten* drücken,
 losfahren, gezählt wird erst, wenn du wirklich rollst. Unter **Hilfe** steht für dein Handy
 in höchstens 3 Schritten, wie die App im Hintergrund weiterläuft.

@@ -1,4 +1,4 @@
-package com.korbi.curvetracker;
+package com.korbi.simplecurvecounter;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,5 +1,5 @@
 /**
- * Planned native plugin `CurveTracker` (Kotlin foreground service / Swift CLLocationManager).
+ * Planned native plugin `SimpleCurveCounter` (Kotlin foreground service / Swift CLLocationManager).
  * NOT implemented yet – this file is the contract the native side will fulfil.
  * Native code owns GPS, ride detection, curve detection and storage, so counting continues
  * when the WebView is frozen or the app is in the background. The web UI only reads and controls.
@@ -37,7 +37,7 @@ export interface PermissionReport {
   vendorExtra: Permission;
 }
 
-export interface CurveTrackerPlugin {
+export interface SimpleCurveCounterPlugin {
   configure(config: TrackerConfig): Promise<void>;
   /** Manual start: arms the ride – it begins when the bike is actually moving. */
   arm(): Promise<void>;

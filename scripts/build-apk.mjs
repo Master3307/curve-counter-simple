@@ -17,7 +17,7 @@ if (!existsSync(apk)) {
 }
 const outDir = join(root, 'dist-apk');
 mkdirSync(outDir, { recursive: true });
-const named = join(outDir, `CurveTracker-v${version}.apk`);
+const named = join(outDir, `SimpleCurveCounter-v${version}.apk`);
 copyFileSync(apk, named);
-copyFileSync(apk, join(outDir, 'CurveTracker-latest.apk'));
+copyFileSync(apk, join(outDir, 'SimpleCurveCounter-latest.apk'));
 console.log(`\n✔ APK ready: ${named}`);

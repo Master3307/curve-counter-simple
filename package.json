@@ -2,7 +2,7 @@
   "name": "simple-curve-tracker",
   "private": true,
   "version": "0.1.0",
-  "description": "Simple Curve Tracker – counts left and right curves per motorcycle ride (German / English).",
+  "description": "Simple Curve Counter – counts left and right curves per motorcycle ride (German / English).",
   "author": "Master3307",
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "sync:android": "pnpm build && cap sync android",
     "sync:ios": "pnpm build && cap sync ios",
     "apk": "pnpm sync:android && node scripts/build-apk.mjs",
-    "apk:install": "adb install -r dist-apk/CurveTracker-latest.apk",
+    "apk:install": "adb install -r dist-apk/SimpleCurveCounter-latest.apk",
     "ios:open": "cap open ios",
     "icons": "capacitor-assets generate --iconBackgroundColor '#14161a' --iconBackgroundColorDark '#14161a' --splashBackgroundColor '#14161a' --splashBackgroundColorDark '#14161a'",
     "release": "node scripts/release.mjs"

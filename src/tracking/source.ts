@@ -2,7 +2,7 @@
  * Where GPS fixes come from.
  *
  * Placeholder: @capacitor/geolocation (works while the app is open / in the foreground).
- * Planned: the native `CurveTracker` plugin (see ./plugin.ts) which keeps running in a
+ * Planned: the native `SimpleCurveCounter` plugin (see ./plugin.ts) which keeps running in a
  * foreground service (Android) / background location mode (iOS) and does the counting natively.
  */
 import { Geolocation } from '@capacitor/geolocation';

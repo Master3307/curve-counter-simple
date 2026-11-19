@@ -1,4 +1,4 @@
-/* Curve Tracker – "road sign" theme. High contrast, huge touch targets, readable in sunlight.
+/* Simple Curve Counter – "road sign" theme. High contrast, huge touch targets, readable in sunlight.
    Left = blue, right = orange (colour-blind safe), always paired with an arrow and a word. */
 :root {
   --bg: #f3f1ea;

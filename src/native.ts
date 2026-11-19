@@ -35,7 +35,7 @@ export interface Checks {
 
 /**
  * Placeholder checks. "Allow all the time" (background) can't be read with the stock
- * geolocation plugin – the native CurveTracker plugin will report it exactly.
+ * geolocation plugin – the native SimpleCurveCounter plugin will report it exactly.
  */
 export async function runChecks(): Promise<Checks> {
   const res: Checks = { location: 'unknown', notifications: 'unknown', battery: 'unknown' };
@@ -84,7 +84,7 @@ export async function runAction(action: Action): Promise<void> {
         if (platform === 'android') await BatteryOptimization.requestIgnoreBatteryOptimization();
         return;
       default:
-        // TODO(native plugin): CurveTracker.openVendorSetting({ key: action })
+        // TODO(native plugin): SimpleCurveCounter.openVendorSetting({ key: action })
         await openApp();
     }
   } catch {
