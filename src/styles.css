@@ -768,3 +768,17 @@ small {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
+.file-btn {
+  position: relative;
+  cursor: pointer;
+}
+.file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.file-btn.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}

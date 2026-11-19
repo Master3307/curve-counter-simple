@@ -27,6 +27,13 @@ export interface Ride {
   /** analysis version and sensitivity the saved numbers were made with */
   algo?: number;
   sensitivity?: Sensitivity;
+  /** where the ride comes from (plan 1.12); missing = recorded by this app */
+  source?: 'recorded' | 'gpx' | 'route';
+  /** file name / app it was imported from */
+  sourceName?: string;
+  fileHash?: string;
+  /** 'approx' = imported with few points */
+  quality?: 'good' | 'approx';
 }
 
 /**
@@ -94,6 +101,8 @@ interface State {
   updateRide(id: string, patch: Partial<Ride>): void;
   addCurves(id: string, curves: Curve[]): void;
   endRide(id: string, endedAt: number): void;
+  /** Adds a finished ride (import), sorted in by start time. */
+  addRide(ride: Ride): void;
   deleteRide(id: string): void;
   /** Removes a ride without offering undo (used when the engine rebuilds a running ride). */
   dropRide(id: string): void;
@@ -215,6 +224,9 @@ export const useStore = create<State>()(
           lastDeleted: { ride: rides[index], index },
           ...(get().activeId === id ? { activeId: null, phase: get().settings.auto ? 'watching' : 'off' } : {}),
         });
+      },
+      addRide(ride) {
+        set({ rides: [...get().rides, ride].sort((a, b) => b.startedAt - a.startedAt) });
       },
       dropRide(id) {
         set({ rides: get().rides.filter((r) => r.id !== id), ...(get().activeId === id ? { activeId: null } : {}) });

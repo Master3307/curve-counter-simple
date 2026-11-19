@@ -433,7 +433,9 @@ export function recountRides(): Promise<void> {
         st().updateRide(ride.id, { hasTrack: false });
         continue;
       }
-      st().updateRide(ride.id, analyzeTrack(fixes, sens));
+      const a = analyzeTrack(fixes, sens);
+      // planned routes have made-up times: never show time or speed numbers for them
+      st().updateRide(ride.id, ride.source === 'route' ? { ...a, movingS: 0, avgSpeed: 0, topSpeed: 0 } : a);
       await new Promise((r) => setTimeout(r, 0)); // keep the UI responsive
     }
   })().finally(() => {

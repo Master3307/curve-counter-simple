@@ -9,6 +9,7 @@ import { RideSummary } from './ui/RideSummary';
 import { IconHelp, IconList, IconRide } from './ui/icons';
 import { runChecks, tapFeedback, type Checks } from './native';
 import { initEngine } from './tracking/engine';
+import { watchInbox } from './tracking/gpxIo';
 
 export function App() {
   const t = useT();
@@ -23,7 +24,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (hydrated) initEngine();
+    if (!hydrated) return;
+    void initEngine();
+    watchInbox(() => {});
   }, [hydrated]);
 
   useEffect(() => {

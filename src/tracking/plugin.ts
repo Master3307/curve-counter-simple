@@ -34,6 +34,14 @@ export interface RecorderPlugin {
 
 export const Recorder = registerPlugin<RecorderPlugin>('Recorder');
 
+/** Files opened with / shared to the app (Android). */
+export interface InboxPlugin {
+  take(): Promise<{ files: { name: string; text: string }[] }>;
+  addListener(event: 'files', cb: () => void): Promise<{ remove(): Promise<void> }>;
+}
+
+export const Inbox = registerPlugin<InboxPlugin>('Inbox');
+
 // ---------------------------------------------------------------------------------------------
 // 2. SimpleCurveCounter (planned)
 
