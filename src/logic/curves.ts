@@ -6,6 +6,14 @@
  * Idea: GPS positions → resampled every STEP metres (so speed doesn't matter) → heading change
  * per step → sliding window sum = "how hard are we turning" → small state machine.
  * Positive heading change = clockwise = RIGHT curve.
+ *
+ * What counts as ONE curve (the definition the ground truth is labelled with, plan 1.8):
+ * - a continuous change of direction ≥ MIN_ANGLE in one direction;
+ * - a straight of ≥ 60 m between two same-direction bends makes them two curves;
+ * - an opposite-direction turn of ≥ ENTER always separates (S-bend = two curves);
+ * - roundabout / hairpin = one curve; lane change / overtake = no curve.
+ * Two passes run on the same samples: the normal 100 m window, and a 500 m window for wide
+ * sweepers. A curve found by both counts once (the normal pass wins).
  */
 import { angleDiff, bearing, distance, type Fix } from './geo';
 
@@ -26,6 +34,12 @@ export interface Curve {
   /** apex position (sharpest point) */
   lat: number;
   lon: number;
+  /** end of the curve, epoch ms (missing in rides from v0.2) */
+  endT?: number;
+  /** length along the road, m */
+  lengthM?: number;
+  /** found by the long-window pass (wide sweeper) */
+  wide?: boolean;
 }
 
 /** Minimum total heading change for a curve to count. */
@@ -52,6 +66,15 @@ export interface CurveOptions {
   maxGapM: number;
   /** a single step turning more than this is a GPS glitch, deg */
   maxStepTurn: number;
+  /**
+   * Second pass for wide sweepers (motorway bends with a large radius, which turn too little
+   * per 100 m for the normal pass). Window in steps, enter/exit in degrees, quiet distance in m.
+   * Set `wideWindow: 0` to switch it off.
+   */
+  wideWindow: number;
+  wideEnter: number;
+  wideExit: number;
+  wideQuietDist: number;
 }
 
 export const DEFAULT_CURVE_OPTIONS: CurveOptions = {
@@ -66,6 +89,10 @@ export const DEFAULT_CURVE_OPTIONS: CurveOptions = {
   maxGapS: 15,
   maxGapM: 300,
   maxStepTurn: 75,
+  wideWindow: 50,
+  wideEnter: 6,
+  wideExit: 2.5,
+  wideQuietDist: 100,
 };
 
 interface Sample {
@@ -73,6 +100,8 @@ interface Sample {
   lat: number;
   lon: number;
   speed: number;
+  /** distance along the track since the detector started, m */
+  d: number;
 }
 
 interface Open {
@@ -81,10 +110,135 @@ interface Open {
   /** opposite-direction turning since the last same-direction step (held back) */
   pending: number;
   t: number;
+  /** where the turning started (window start), m */
+  startD: number;
   speeds: number[];
   quiet: number;
   apex: Sample;
   apexTurn: number;
+  /** [distance, accumulated turning] along the curve, to measure its real length */
+  trace: [number, number][];
+}
+
+/**
+ * Length of the turning part: distance over which the accumulated turn goes from 10 % to 90 %
+ * of the total, scaled to 100 %. Robust against the window smearing the start and end.
+ */
+function turningLength(trace: [number, number][], total: number): number {
+  const at = (frac: number) => {
+    const target = Math.abs(total) * frac;
+    for (let i = 1; i < trace.length; i++) {
+      const [d0, a0] = trace[i - 1];
+      const [d1, a1] = trace[i];
+      const v0 = Math.abs(a0);
+      const v1 = Math.abs(a1);
+      if (v1 >= target) return v1 === v0 ? d1 : d0 + ((target - v0) / (v1 - v0)) * (d1 - d0);
+    }
+    return trace[trace.length - 1][0];
+  };
+  return (at(0.9) - at(0.1)) / 0.8;
+}
+
+/** A closed candidate, before the angle / speed rules are applied. */
+interface Closed {
+  open: Open;
+  end: Sample;
+  /** where the turning ended (without the quiet tail), m */
+  endD: number;
+}
+
+/** One sliding-window state machine. */
+class Pass {
+  private win: number[] = [];
+  private open: Open | null = null;
+
+  constructor(
+    private step: number,
+    private window: number,
+    private enter: number,
+    private exit: number,
+    private quietDist: number,
+  ) {}
+
+  get current(): Open | null {
+    return this.open;
+  }
+
+  reset() {
+    this.win = [];
+    this.open = null;
+  }
+
+  feed(s: Sample, turn: number, out: Closed[]) {
+    this.win.push(turn);
+    if (this.win.length > this.window) this.win.shift();
+    const w = this.win.reduce((a, b) => a + b, 0);
+    const wDir: Dir = w >= 0 ? 'R' : 'L';
+    const windowStart = s.d - this.win.length * this.step;
+
+    const cur = this.open;
+    if (!cur) {
+      if (Math.abs(w) >= this.enter) this.start(s, w, wDir, windowStart, true);
+      return;
+    }
+
+    if (wDir !== cur.dir && Math.abs(w) >= this.enter) {
+      // S-bend: close this one, the opposite curve starts right away with the opposite
+      // turning that was held back
+      const carried = cur.pending + turn;
+      this.closeInto(s, out);
+      this.start(s, carried, wDir, s.d, false);
+      return;
+    }
+
+    const same = cur.dir === 'R' ? turn >= 0 : turn <= 0;
+    if (same) {
+      cur.total += cur.pending + turn;
+      cur.pending = 0;
+      cur.trace.push([s.d, cur.total]);
+    } else {
+      cur.pending += turn;
+    }
+    cur.speeds.push(s.speed);
+    if (Math.abs(turn) > cur.apexTurn) {
+      cur.apexTurn = Math.abs(turn);
+      cur.apex = s;
+    }
+    if (Math.abs(w) < this.exit) {
+      cur.quiet += this.step;
+      if (cur.quiet >= this.quietDist) this.closeInto(s, out);
+    } else {
+      cur.quiet = 0;
+    }
+  }
+
+  /** End of track / gap: close what is open. */
+  close(last: Sample | null, out: Closed[]) {
+    if (this.open && last) this.closeInto(last, out);
+    this.reset();
+  }
+
+  /** `fromWindow`: the opening turning `w` is the whole window (else carried over from an S-bend). */
+  private start(s: Sample, w: number, dir: Dir, startD: number, fromWindow: boolean) {
+    // the turning already in the window, step by step (not as one lump at the end)
+    const trace: [number, number][] = [[startD, 0]];
+    if (fromWindow) {
+      let acc = 0;
+      this.win.forEach((x, i) => {
+        acc += x;
+        trace.push([s.d - (this.win.length - 1 - i) * this.step, acc]);
+      });
+    } else {
+      trace.push([s.d, w]);
+    }
+    this.open = { dir, total: w, pending: 0, t: s.t, startD, speeds: [s.speed], quiet: 0, apex: s, apexTurn: 0, trace };
+  }
+
+  private closeInto(s: Sample, out: Closed[]) {
+    const c = this.open;
+    this.open = null;
+    if (c) out.push({ open: c, end: s, endD: s.d - c.quiet });
+  }
 }
 
 export class CurveDetector {
@@ -94,13 +248,18 @@ export class CurveDetector {
   private recent: { lat: number; lon: number }[] = [];
   private prevPos: { lat: number; lon: number } | null = null;
   private carry = 0;
+  private dist = 0;
   private prevSample: Sample | null = null;
   private prevHeading: number | null = null;
-  private win: number[] = [];
-  private open: Open | null = null;
+  private normal: Pass;
+  private wide: Pass | null;
+  /** stretches [startD, endD] covered by curves of the normal pass (to merge the wide pass) */
+  private covered: [number, number][] = [];
 
   constructor(options: Partial<CurveOptions> = {}) {
     this.o = { ...DEFAULT_CURVE_OPTIONS, ...options };
+    this.normal = new Pass(this.o.step, this.o.window, this.o.enter, this.o.exit, this.o.quietDist);
+    this.wide = this.o.wideWindow > 0 ? new Pass(this.o.step, this.o.wideWindow, this.o.wideEnter, this.o.wideExit, this.o.wideQuietDist) : null;
   }
 
   /** Feed one GPS fix. Returns the curves that were completed by it (usually none). */
@@ -114,7 +273,7 @@ export class CurveDetector {
       if (dt <= 0) return out;
       const d = distance(this.last, fix);
       if (dt > this.o.maxGapS || d > this.o.maxGapM) {
-        this.closeInto(out);
+        this.closeAll(out);
         this.resetTrack();
       } else if (d / dt > 70) {
         return out; // impossible jump → glitch
@@ -134,7 +293,7 @@ export class CurveDetector {
 
     if (!this.prevPos) {
       this.prevPos = pos;
-      this.prevSample = { t: fix.t, ...pos, speed };
+      this.prevSample = { t: fix.t, ...pos, speed, d: this.dist };
       return out;
     }
 
@@ -143,11 +302,13 @@ export class CurveDetector {
     let at = this.o.step - this.carry;
     while (at <= seg) {
       const f = at / seg;
+      this.dist += this.o.step;
       const s: Sample = {
         t: fix.t,
         lat: this.prevPos.lat + (pos.lat - this.prevPos.lat) * f,
         lon: this.prevPos.lon + (pos.lon - this.prevPos.lon) * f,
         speed,
+        d: this.dist,
       };
       this.onSample(s, out);
       at += this.o.step;
@@ -160,7 +321,7 @@ export class CurveDetector {
   /** End of ride: close a curve that is still open. */
   flush(): Curve[] {
     const out: Curve[] = [];
-    this.closeInto(out);
+    this.closeAll(out);
     this.resetTrack();
     return out;
   }
@@ -172,8 +333,18 @@ export class CurveDetector {
     this.carry = 0;
     this.prevSample = null;
     this.prevHeading = null;
-    this.win = [];
-    this.open = null;
+    this.normal.reset();
+    this.wide?.reset();
+    this.covered = [];
+  }
+
+  private closeAll(out: Curve[]) {
+    const closed: Closed[] = [];
+    this.normal.close(this.prevSample, closed);
+    closed.forEach((c) => this.acceptNormal(c, out));
+    const wide: Closed[] = [];
+    this.wide?.close(this.prevSample, wide);
+    wide.forEach((c) => this.acceptWide(c, out));
   }
 
   private onSample(s: Sample, out: Curve[]) {
@@ -188,61 +359,46 @@ export class CurveDetector {
     let turn = angleDiff(ph, h);
     if (Math.abs(turn) > this.o.maxStepTurn) turn = 0;
 
-    this.win.push(turn);
-    if (this.win.length > this.o.window) this.win.shift();
-    const w = this.win.reduce((a, b) => a + b, 0);
-    const wDir: Dir = w >= 0 ? 'R' : 'L';
-
-    const cur = this.open;
-    if (!cur) {
-      if (Math.abs(w) >= this.o.enter) this.start(s, w, wDir);
-      return;
+    const closed: Closed[] = [];
+    this.normal.feed(s, turn, closed);
+    closed.forEach((c) => this.acceptNormal(c, out));
+    if (this.wide) {
+      const wide: Closed[] = [];
+      this.wide.feed(s, turn, wide);
+      wide.forEach((c) => this.acceptWide(c, out));
     }
-
-    if (wDir !== cur.dir && Math.abs(w) >= this.o.enter) {
-      // S-bend: close this one, the opposite curve starts right away with the opposite
-      // turning that was held back
-      const carried = cur.pending + turn;
-      this.closeInto(out);
-      this.start(s, carried, wDir);
-      return;
-    }
-
-    const same = cur.dir === 'R' ? turn >= 0 : turn <= 0;
-    if (same) {
-      cur.total += cur.pending + turn;
-      cur.pending = 0;
-    } else {
-      cur.pending += turn;
-    }
-    cur.speeds.push(s.speed);
-    if (Math.abs(turn) > cur.apexTurn) {
-      cur.apexTurn = Math.abs(turn);
-      cur.apex = s;
-    }
-    if (Math.abs(w) < this.o.exit) {
-      cur.quiet += this.o.step;
-      if (cur.quiet >= this.o.quietDist) this.closeInto(out);
-    } else {
-      cur.quiet = 0;
-    }
+    // forget covered stretches that no open wide curve can reach any more
+    const keepFrom = s.d - (this.o.wideWindow + 10) * this.o.step - 5000;
+    while (this.covered.length && this.covered[0][1] < keepFrom) this.covered.shift();
   }
 
-  private start(s: Sample, w: number, dir: Dir) {
-    this.open = { dir, total: w, pending: 0, t: s.t, speeds: [s.speed], quiet: 0, apex: s, apexTurn: 0 };
+  private acceptNormal(c: Closed, out: Curve[]) {
+    // even rejected candidates (too small, too slow) block the wide pass: that stretch
+    // was looked at by the normal pass and judged
+    this.covered.push([c.open.startD, c.endD]);
+    const curve = this.toCurve(c, false);
+    if (curve) out.push(curve);
   }
 
-  private closeInto(out: Curve[]) {
-    const c = this.open;
-    this.open = null;
-    if (!c) return;
+  private acceptWide(c: Closed, out: Curve[]) {
+    const from = c.open.startD;
+    const to = c.endD;
+    const overlaps = (a: number, b: number) => a <= to && b >= from;
+    if (this.covered.some(([a, b]) => overlaps(a, b))) return;
+    const open = this.normal.current;
+    if (open && overlaps(open.startD, Infinity)) return;
+    const curve = this.toCurve(c, true);
+    if (curve) out.push(curve);
+  }
+
+  private toCurve({ open: c, end }: Closed, wide: boolean): Curve | null {
     const angle = Math.abs(c.total);
     const totalDir: Dir = c.total >= 0 ? 'R' : 'L';
-    if (totalDir !== c.dir || angle < MIN_ANGLE[this.o.sensitivity]) return;
+    if (totalDir !== c.dir || angle < MIN_ANGLE[this.o.sensitivity]) return null;
     const avg = c.speeds.reduce((a, b) => a + b, 0) / c.speeds.length;
     const min = Math.min(...c.speeds);
-    if (min < this.o.minApexSpeed) return;
-    out.push({
+    if (min < this.o.minApexSpeed) return null;
+    const curve: Curve = {
       t: c.t,
       dir: c.dir,
       angle: Math.round(angle),
@@ -252,6 +408,10 @@ export class CurveDetector {
       exitSpeed: c.speeds[c.speeds.length - 1],
       lat: c.apex.lat,
       lon: c.apex.lon,
-    });
+      endT: end.t,
+      lengthM: Math.max(this.o.step, Math.round(turningLength(c.trace, c.total))),
+    };
+    if (wide) curve.wide = true;
+    return curve;
   }
 }

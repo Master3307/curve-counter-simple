@@ -120,4 +120,128 @@ describe('CurveDetector', () => {
     const c = run(simulate(legs, { noise: 1, seed: 3 }));
     expect(dirs(c)).toBe('RLRLRLR');
   });
+
+  describe('definition of "one curve" (plan 1.8)', () => {
+    it('counts a wide motorway sweeper (60° at r = 1000 m) once', () => {
+      const c = run(
+        simulate(
+          [
+            { kind: 'straight', length: 1000, speedKmh: 120 },
+            { kind: 'arc', radius: 1000, angle: 60, speedKmh: 120 },
+            { kind: 'straight', length: 1000, speedKmh: 120 },
+          ],
+          { noise: 2, seed: 11 },
+        ),
+      );
+      expect(dirs(c)).toBe('R');
+      expect(c[0].wide).toBe(true);
+      expect(c[0].angle).toBeGreaterThan(50);
+      expect(c[0].angle).toBeLessThan(70);
+    });
+
+    it('counts two opposite sweepers on a motorway', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 800, speedKmh: 120 },
+          { kind: 'arc', radius: 900, angle: -50, speedKmh: 120 },
+          { kind: 'straight', length: 1200, speedKmh: 120 },
+          { kind: 'arc', radius: 1200, angle: 45, speedKmh: 120 },
+          { kind: 'straight', length: 800, speedKmh: 120 },
+        ]),
+      );
+      expect(dirs(c)).toBe('LR');
+    });
+
+    it('a long straight motorway with GPS noise counts nothing (no fake sweepers)', () => {
+      for (const seed of [1, 2, 3]) {
+        expect(run(simulate([{ kind: 'straight', length: 8000, speedKmh: 120 }], { noise: 4, seed }))).toHaveLength(0);
+      }
+    });
+
+    it('a normal curve is counted once, not again by the wide pass', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 600, speedKmh: 90 },
+          { kind: 'arc', radius: 250, angle: 70, speedKmh: 90 },
+          { kind: 'straight', length: 600, speedKmh: 90 },
+        ]),
+      );
+      expect(dirs(c)).toBe('R');
+      expect(c[0].wide).toBeUndefined();
+    });
+
+    it('same direction with a 40 m straight inside = one curve', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 300, speedKmh: 60 },
+          { kind: 'arc', radius: 60, angle: 50, speedKmh: 55 },
+          { kind: 'straight', length: 40, speedKmh: 55 },
+          { kind: 'arc', radius: 60, angle: 50, speedKmh: 55 },
+          { kind: 'straight', length: 300, speedKmh: 60 },
+        ]),
+      );
+      expect(dirs(c)).toBe('R');
+      expect(c[0].angle).toBeGreaterThan(85);
+    });
+
+    it('same direction with a 150 m straight between = two curves', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 300, speedKmh: 60 },
+          { kind: 'arc', radius: 60, angle: 50, speedKmh: 55 },
+          { kind: 'straight', length: 150, speedKmh: 60 },
+          { kind: 'arc', radius: 60, angle: 50, speedKmh: 55 },
+          { kind: 'straight', length: 300, speedKmh: 60 },
+        ]),
+      );
+      expect(dirs(c)).toBe('RR');
+    });
+
+    it('a roundabout (right in, 270° left, right out) is one curve', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 300, speedKmh: 50 },
+          { kind: 'arc', radius: 20, angle: 45, speedKmh: 25 },
+          { kind: 'arc', radius: 18, angle: -270, speedKmh: 25 },
+          { kind: 'arc', radius: 20, angle: 45, speedKmh: 25 },
+          { kind: 'straight', length: 300, speedKmh: 50 },
+        ]),
+      );
+      expect(c.filter((x) => x.angle >= 150)).toHaveLength(1);
+      expect(c.filter((x) => x.angle >= 150)[0].dir).toBe('L');
+    });
+
+    it('an overtake / lane change counts nothing, even at "many"', () => {
+      const c = run(
+        simulate(
+          [
+            { kind: 'straight', length: 400, speedKmh: 100 },
+            { kind: 'arc', radius: 400, angle: -6, speedKmh: 110 },
+            { kind: 'arc', radius: 400, angle: 6, speedKmh: 110 },
+            { kind: 'straight', length: 200, speedKmh: 110 },
+            { kind: 'arc', radius: 400, angle: 6, speedKmh: 110 },
+            { kind: 'arc', radius: 400, angle: -6, speedKmh: 110 },
+            { kind: 'straight', length: 400, speedKmh: 100 },
+          ],
+          { noise: 1.5, seed: 5 },
+        ),
+        { sensitivity: 'many' },
+      );
+      expect(c).toHaveLength(0);
+    });
+
+    it('stores where a curve ends and how long it is', () => {
+      const c = run(
+        simulate([
+          { kind: 'straight', length: 300, speedKmh: 60 },
+          { kind: 'arc', radius: 100, angle: 90, speedKmh: 60 },
+          { kind: 'straight', length: 300, speedKmh: 60 },
+        ]),
+      );
+      // arc length = 100 · π/2 ≈ 157 m
+      expect(c[0].lengthM).toBeGreaterThan(157 * 0.85);
+      expect(c[0].lengthM).toBeLessThan(157 * 1.25);
+      expect(c[0].endT).toBeGreaterThan(c[0].t);
+    });
+  });
 });
