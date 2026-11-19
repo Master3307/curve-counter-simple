@@ -15,7 +15,8 @@ def keystoreProps = new Properties()
 if (keystorePropsFile.exists()) keystorePropsFile.withInputStream { keystoreProps.load(it) }
 def signValue = { String prop, String env -> keystoreProps.getProperty(prop) ?: System.getenv(env) }
 def releaseStoreFile = signValue('storeFile', 'SCT_KEYSTORE_FILE')
-def hasReleaseSigning = releaseStoreFile && file(releaseStoreFile).exists()
+// relative paths (keystore.properties) are relative to android/, absolute ones (CI) stay as they are
+def hasReleaseSigning = releaseStoreFile && rootProject.file(releaseStoreFile).exists()
 
 android {
     namespace = "com.korbi.simplecurvecounter"
@@ -36,7 +37,7 @@ android {
     signingConfigs {
         if (hasReleaseSigning) {
             release {
-                storeFile file(releaseStoreFile)
+                storeFile rootProject.file(releaseStoreFile)
                 storePassword signValue('storePassword', 'SCT_KEYSTORE_PASSWORD')
                 keyAlias signValue('keyAlias', 'SCT_KEY_ALIAS')
                 keyPassword signValue('keyPassword', 'SCT_KEY_PASSWORD')
