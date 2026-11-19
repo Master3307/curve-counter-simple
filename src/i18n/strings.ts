@@ -233,7 +233,8 @@ const en: Strings = {
 
 export const STRINGS: Record<Lang, Strings> = { de, en };
 
-export function detectLang(): Lang {
-  const l = (typeof navigator !== 'undefined' ? navigator.language : 'en').toLowerCase();
-  return l.startsWith('de') ? 'de' : 'en';
-}
+/** German first: the app starts in German on every phone; English is one tap away in Help. */
+export const DEFAULT_LANG: Lang = 'de';
+
+/** Locale for numbers, dates and times – European formats also in English (24 h, day before month). */
+export const localeOf = (lang: Lang) => (lang === 'de' ? 'de-DE' : 'en-GB');

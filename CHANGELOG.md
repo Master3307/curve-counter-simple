@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- German first: the app starts in German with km/h and km on every phone (English and miles
+  can be chosen under Help). Dates and times use European formats in both languages.
+
 ## 0.2.0 – 2026-11-19
 
 - Android: rides are recorded by a native foreground service (GPS keeps running with the

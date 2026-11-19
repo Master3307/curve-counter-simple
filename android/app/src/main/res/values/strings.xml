@@ -4,6 +4,6 @@
     <string name="title_activity_main">Simple Curve Counter</string>
     <string name="package_name">com.korbi.simplecurvecounter</string>
     <string name="custom_url_scheme">com.korbi.simplecurvecounter</string>
-    <string name="notification_channel">Ride</string>
-    <string name="notification_recording">Ride is being recorded</string>
+    <string name="notification_channel">Fahrt</string>
+    <string name="notification_recording">Fahrt wird aufgezeichnet</string>
 </resources>

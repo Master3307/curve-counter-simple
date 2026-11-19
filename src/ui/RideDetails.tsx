@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { curveMetrics, STRENGTHS, summarizeCurves } from '../logic/curveMetrics';
 import { useStore, useT, type Ride } from '../store';
+import { localeOf } from '../i18n/strings';
 import { fmtHeight, fmtSpeed, fmtTime, speedUnit } from './format';
 import type { HeightTotals } from '../logic/height';
 import { IconCurveLeft, IconCurveRight } from './icons';
@@ -14,7 +15,7 @@ export function RideDetails({ ride, actions }: { ride: Ride; actions?: ReactNode
   const { units, lang } = useStore((s) => s.settings);
   const sum = summarizeCurves(ride.curves, ride.distanceM);
   const max = Math.max(1, ...STRENGTHS.map((k) => sum.classes[k]));
-  const num = (n: number, digits = 0) => n.toLocaleString(lang, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+  const num = (n: number, digits = 0) => n.toLocaleString(localeOf(lang), { maximumFractionDigits: digits, minimumFractionDigits: digits });
   const spd = (v: number | null) => (v == null ? '–' : `${fmtSpeed(v, units)} ${speedUnit(units)}`);
 
   return (

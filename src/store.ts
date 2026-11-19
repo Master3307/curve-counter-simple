@@ -3,7 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import { Preferences } from '@capacitor/preferences';
 import type { Curve, Sensitivity } from './logic/curves';
 import type { HeightTotals } from './logic/height';
-import { detectLang, STRINGS, type Lang } from './i18n/strings';
+import { DEFAULT_LANG, STRINGS, type Lang } from './i18n/strings';
 
 export interface Ride {
   id: string;
@@ -138,12 +138,13 @@ export const flushStorage = () => {
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 export const DEFAULT_SETTINGS: Settings = {
-  lang: detectLang(),
+  lang: DEFAULT_LANG,
   /** experimental automatic ride detection – off by default, manual is the main mode */
   auto: false,
   sensitivity: 'normal',
   pauseMinutes: 10,
-  units: detectLang() === 'en' && navigator.language === 'en-US' ? 'imperial' : 'metric',
+  /** European default; miles can be picked in Help */
+  units: 'metric',
   textScale: 1,
   theme: 'system',
   haptics: true,
