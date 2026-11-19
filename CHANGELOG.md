@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Android: rides are recorded by a native foreground service (GPS keeps running with the
+  screen off, permanent notification with live counts and speed).
+- Rides are never lost: every GPS fix is written to a log right away; if the app is killed
+  mid-ride, the ride is rebuilt from that log on the next start.
+- The ride screen says so in plain words when location isn't allowed or GPS is weak.
+
 ## 0.1.0 – 2026-11-19
 
 - Project placeholder: Vite + React + Capacitor 8 (Android + iOS), German / English.

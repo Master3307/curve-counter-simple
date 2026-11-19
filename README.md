@@ -4,9 +4,10 @@ A dead-simple motorcycle app (German / English) that counts your **left curves, 
 and the total** for every ride, along with ride time, distance and speed.
 Made to be understood by anyone: big numbers, big buttons, plain words.
 
-> **Status: early placeholder (v0.1).** The UI, the curve/ride detection logic (with tests) and
-> the build pipelines are in place. Counting **in the background** needs the native
-> `SimpleCurveCounter` plugin, which isn't written yet. Until then the app counts while it's open.
+> **Status: early version (v0.1).** The UI, the curve/ride detection logic (with tests) and
+> the build pipelines are in place. **Android** records the ride natively in the background
+> (screen off, app killed → the ride is rebuilt from the recorded GPS log). **iPhone and the
+> browser** still only count while the app is open, until the native iOS recorder exists.
 
 ## How it works
 
@@ -64,7 +65,8 @@ pnpm sync:ios && pnpm ios:open   # open the iOS project in Xcode (macOS)
 ```
 src/
   logic/        curves.ts (curve detector) · rideDetector.ts · rideStats.ts · geo.ts · simulate.ts
-  tracking/     engine.ts (GPS → detectors → store) · source.ts (GPS / demo) · plugin.ts (native API contract)
+  tracking/     engine.ts (fix log → detectors → store) · source.ts (native / web GPS / demo) · plugin.ts (native API)
+android/app/src/main/java/…/tracking/   RecorderService (foreground GPS service) · FixLog · RecorderPlugin
   guides/       per-brand "keep the app alive" guides (de/en)
   screens/      Ride · My rides · Help
   ui/           components, icons, formatting
