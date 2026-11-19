@@ -23,8 +23,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * (Rule 1: never lose a ride). Kept in memory as well so the WebView can read it fast.
  *
  * Files (app-private): recorder/session  = session id (exists while a session is recorded)
- *                      recorder/fixes.csv = one line per fix: t,lat,lon,speed,accuracy
- *                                           (speed empty when the GPS gave none)
+ *                      recorder/fixes.csv = one line per fix: t,lat,lon,speed,accuracy,alt
+ *                                           (speed / alt empty when the GPS gave none;
+ *                                           alt = height above sea level where available)
  *
  * TODO(milestone 2b): Room/SQLite with ride, curve and fix tables (plan 1.5), raw fixes kept
  * after the ride for re-analysis.
@@ -80,7 +81,8 @@ public final class FixLog {
 
     private static double[] parse(String line) {
         String[] p = line.split(",", -1);
-        if (p.length != 5) return null;
+        // 5 fields = log written by v0.2 (no height)
+        if (p.length != 5 && p.length != 6) return null;
         try {
             return new double[] {
                 Double.parseDouble(p[0]),
@@ -88,6 +90,7 @@ public final class FixLog {
                 Double.parseDouble(p[2]),
                 p[3].isEmpty() ? Double.NaN : Double.parseDouble(p[3]),
                 Double.parseDouble(p[4]),
+                p.length < 6 || p[5].isEmpty() ? Double.NaN : Double.parseDouble(p[5]),
             };
         } catch (NumberFormatException e) {
             return null;
@@ -127,15 +130,17 @@ public final class FixLog {
         sessionFile.delete();
     }
 
-    public void append(Location l) {
+    /** @param alt height above sea level, NaN when unknown */
+    public void append(Location l, double alt) {
         synchronized (this) {
             if (sessionId == null) return;
             double speed = l.hasSpeed() ? l.getSpeed() : Double.NaN;
             double acc = l.hasAccuracy() ? l.getAccuracy() : 99;
-            double[] f = {l.getTime(), l.getLatitude(), l.getLongitude(), speed, acc};
+            double[] f = {l.getTime(), l.getLatitude(), l.getLongitude(), speed, acc, alt};
             fixes.add(f);
             // Double.toString always uses '.', independent of the phone's language
-            String line = (long) f[0] + "," + f[1] + "," + f[2] + "," + (Double.isNaN(speed) ? "" : Double.toString(speed)) + "," + acc + "\n";
+            String line = (long) f[0] + "," + f[1] + "," + f[2] + "," + (Double.isNaN(speed) ? "" : Double.toString(speed)) + "," + acc + ","
+                + (Double.isNaN(alt) ? "" : Double.toString(alt)) + "\n";
             try {
                 if (out == null) out = new FileOutputStream(fixesFile, true);
                 out.write(line.getBytes(StandardCharsets.UTF_8));
@@ -164,6 +169,8 @@ public final class FixLog {
             if (Double.isNaN(f[3])) o.put("speed", JSONObject.NULL);
             else o.put("speed", f[3]);
             o.put("accuracy", f[4]);
+            if (Double.isNaN(f[5])) o.put("alt", JSONObject.NULL);
+            else o.put("alt", f[5]);
             arr.put(o);
         }
         return arr;

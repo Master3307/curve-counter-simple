@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import { Preferences } from '@capacitor/preferences';
 import type { Curve, Sensitivity } from './logic/curves';
+import type { HeightTotals } from './logic/height';
 import { detectLang, STRINGS, type Lang } from './i18n/strings';
 
 export interface Ride {
@@ -19,6 +20,13 @@ export interface Ride {
   avgSpeed: number;
   topSpeed: number;
   curves: Curve[];
+  /** height meter (plan 1.10); null/missing when the GPS gave no height */
+  height?: HeightTotals | null;
+  /** the track file exists (tracks.ts) → can be recounted and exported */
+  hasTrack?: boolean;
+  /** analysis version and sensitivity the saved numbers were made with */
+  algo?: number;
+  sensitivity?: Sensitivity;
 }
 
 /**

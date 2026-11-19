@@ -12,10 +12,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.Location;
+import android.location.altitude.AltitudeConverter;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -54,6 +56,9 @@ public class RecorderService extends Service implements LocationListener {
     private static volatile String text;
 
     private PowerManager.WakeLock wakeLock;
+    /** location callbacks run here: writing + height conversion must not block the UI thread */
+    private HandlerThread gpsThread;
+    private AltitudeConverter altitudeConverter;
     private boolean recording;
 
     // -------------------------------------------------------------------------------------------
@@ -132,7 +137,9 @@ public class RecorderService extends Service implements LocationListener {
         }
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         try {
-            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, INTERVAL_MS, 0f, this, Looper.getMainLooper());
+            gpsThread = new HandlerThread("gps");
+            gpsThread.start();
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, INTERVAL_MS, 0f, this, gpsThread.getLooper());
         } catch (Exception e) {
             Log.e(TAG, "GPS not available", e);
             shutdown();
@@ -150,6 +157,7 @@ public class RecorderService extends Service implements LocationListener {
             LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             lm.removeUpdates(this);
         }
+        quitGpsThread();
         recording = false;
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         wakeLock = null;
@@ -165,14 +173,41 @@ public class RecorderService extends Service implements LocationListener {
             ((LocationManager) getSystemService(Context.LOCATION_SERVICE)).removeUpdates(this);
             recording = false;
         }
+        quitGpsThread();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (running == this) running = null;
         super.onDestroy();
     }
 
+    private void quitGpsThread() {
+        if (gpsThread != null) gpsThread.quitSafely();
+        gpsThread = null;
+    }
+
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        FixLog.get(this).append(location);
+        FixLog.get(this).append(location, seaLevelAltitude(location));
+    }
+
+    /**
+     * Height above sea level. getAltitude() is above the WGS84 ellipsoid (up to ~50 m off in
+     * Europe); Android 14+ can convert it (AltitudeConverter, offline geoid model).
+     * TODO(plan 1.10): small EGM2008 geoid grid for older phones, barometer fusion.
+     */
+    private double seaLevelAltitude(Location l) {
+        if (!l.hasAltitude()) return Double.NaN;
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                if (!l.hasMslAltitude()) {
+                    if (altitudeConverter == null) altitudeConverter = new AltitudeConverter();
+                    altitudeConverter.addMslAltitudeToLocation(this, l);
+                }
+                if (l.hasMslAltitude()) return l.getMslAltitudeMeters();
+            } catch (Exception e) {
+                Log.w(TAG, "MSL conversion failed", e);
+            }
+        }
+        return l.getAltitude();
     }
 
     // older Android versions call these; nothing to do

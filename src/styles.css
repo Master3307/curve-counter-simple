@@ -754,3 +754,17 @@ small {
 .dialog.summary h2 {
   margin: 0;
 }
+.profile {
+  width: 100%;
+  height: 5rem;
+  display: block;
+}
+.profile-fill {
+  fill: var(--surface-2);
+}
+.profile-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}

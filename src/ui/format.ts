@@ -25,3 +25,9 @@ export function fmtDate(t: number, lang: Lang): string {
 export function fmtTime(t: number, lang: Lang): string {
   return new Date(t).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }
+
+/** 1 245 m · 4 085 ft */
+export function fmtHeight(m: number, units: Units, lang: Lang): string {
+  const v = Math.round(units === 'imperial' ? m * 3.28084 : m);
+  return `${v.toLocaleString(lang)} ${units === 'imperial' ? 'ft' : 'm'}`;
+}

@@ -110,6 +110,7 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
           ]}
           onChange={(sensitivity) => update({ sensitivity })}
         />
+        <p className="hint">{t.sensitivityRecount}</p>
         <Segmented
           label={t.units}
           value={s.units}

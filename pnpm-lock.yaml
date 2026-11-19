@@ -178,6 +178,9 @@ importers:
       '@capacitor/device':
         specifier: ^8.0.3
         version: 8.0.3(@capacitor/core@8.6.2)
+      '@capacitor/filesystem':
+        specifier: 8.1.5
+        version: 8.1.5(@capacitor/core@8.6.2)
       '@capacitor/geolocation':
         specifier: ^8.2.5
         version: 8.2.5(@capacitor/core@8.6.2)
@@ -193,6 +196,9 @@ importers:
       '@capacitor/preferences':
         specifier: ^8.0.1
         version: 8.0.1(@capacitor/core@8.6.2)
+      '@capacitor/share':
+        specifier: 8.0.3
+        version: 8.0.3(@capacitor/core@8.6.2)
       '@capacitor/status-bar':
         specifier: ^8.0.4
         version: 8.0.4(@capacitor/core@8.6.2)
@@ -273,6 +279,11 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
+  '@capacitor/filesystem@8.1.5':
+    resolution: {integrity: sha512-m1RkI8L83NJeppEKyRWioK3MDp2vjlA+QfUQcF8/xRlcXNC2HYxqoyYJ+K4M0EcVovy+g+4F24S05+bhK4Vgdg==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
   '@capacitor/geolocation@8.2.5':
     resolution: {integrity: sha512-DFhbXDsp/5HrKmgLd12w25ERhDzesTqU4vKRS/8a7BLaVV8tt/lkDfqt6Fzqka7Vino6uU9cPFR9v/zMfZ1YFQ==}
     peerDependencies:
@@ -295,6 +306,11 @@ packages:
 
   '@capacitor/preferences@8.0.1':
     resolution: {integrity: sha512-T6no3ebi79XJCk91U3Jp/liJUwgBdvHR+s6vhvPkPxSuch7z3zx5Rv1bdWM6sWruNx+pViuEGqZvbfCdyBvcHQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/share@8.0.3':
+    resolution: {integrity: sha512-gnvZBV1NPu2B8vd1UKncR56G15ueHd0aZLqgDov++t3SmTBG9Q0VrAZ1VnHn5stxlmglVaTb4RwopMgbpLzroA==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -1553,6 +1569,11 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.6.2
 
+  '@capacitor/filesystem@8.1.5(@capacitor/core@8.6.2)':
+    dependencies:
+      '@capacitor/core': 8.6.2
+      '@capacitor/synapse': 1.0.4
+
   '@capacitor/geolocation@8.2.5(@capacitor/core@8.6.2)':
     dependencies:
       '@capacitor/core': 8.6.2
@@ -1571,6 +1592,10 @@ snapshots:
       '@capacitor/core': 8.6.2
 
   '@capacitor/preferences@8.0.1(@capacitor/core@8.6.2)':
+    dependencies:
+      '@capacitor/core': 8.6.2
+
+  '@capacitor/share@8.0.3(@capacitor/core@8.6.2)':
     dependencies:
       '@capacitor/core': 8.6.2
 

@@ -108,6 +108,11 @@ const de = {
   wideCurve: 'weit',
   noCurves: 'Keine Kurven auf dieser Fahrt.',
   exportGpx: 'Als GPX-Datei speichern',
+  height: 'Höhe',
+  highest: (h: string) => `Höchster Punkt: ${h}`,
+  climb: (up: string, down: string) => `↑ ${up} bergauf · ↓ ${down} bergab`,
+  heightProfile: 'Höhenprofil',
+  sensitivityRecount: 'Deine gespeicherten Fahrten werden dabei neu gezählt.',
   placeholderNote:
     'Vorschau-Version. Android: zählt auch mit ausgeschaltetem Bildschirm. iPhone und Browser: App bitte offen lassen.',
 };
@@ -217,6 +222,11 @@ const en: Strings = {
   wideCurve: 'wide',
   noCurves: 'No curves on this ride.',
   exportGpx: 'Save as GPX file',
+  height: 'Height',
+  highest: (h: string) => `Highest point: ${h}`,
+  climb: (up: string, down: string) => `↑ ${up} uphill · ↓ ${down} downhill`,
+  heightProfile: 'Height profile',
+  sensitivityRecount: 'Your saved rides are recounted too.',
   placeholderNote:
     'Preview version. Android: counts with the screen off too. iPhone and browser: please keep the app open.',
 };

@@ -19,6 +19,9 @@ import { CurveDetector, type Curve } from '../logic/curves';
 import type { Fix } from '../logic/geo';
 import { MANUAL_START, RideDetector } from '../logic/rideDetector';
 import { RideStats } from '../logic/rideStats';
+import { HeightStats } from '../logic/height';
+import { ALGO_VERSION, analyzeTrack } from '../logic/analyze';
+import { loadTrack, saveTrack, watchTrackDeletes } from './tracks';
 import { STRINGS } from '../i18n/strings';
 import { fmtDuration, fmtSpeed, speedUnit } from '../ui/format';
 import { flushStorage, useStore, type Ride, type Session } from '../store';
@@ -38,6 +41,9 @@ let started = false;
 let rideDetector = new RideDetector();
 let curves = new CurveDetector();
 let stats = new RideStats();
+let height = new HeightStats();
+/** all fixes of the running ride (saved as its track when it ends) */
+let track: Fix[] = [];
 let lastFix: Fix | null = null;
 /** curves found in the current batch, written to the store once per batch */
 let newCurves: Curve[] = [];
@@ -59,6 +65,8 @@ function activeRide() {
 function feedRide(fix: Fix) {
   newCurves.push(...curves.push(fix));
   stats.push(fix);
+  height.push(fix);
+  track.push(fix);
 }
 
 /** Writes the curves and totals collected since the last flush to the store. */
@@ -75,6 +83,8 @@ function flushRide() {
     movingS,
     avgSpeed: movingS > 0 ? distanceM / movingS : 0,
     topSpeed: Math.max(base?.topSpeed ?? 0, t.topSpeed),
+    // after a lost log (base) the height of the first part is unknown → leave it
+    ...(base ? {} : { height: height.totals() }),
   });
 }
 
@@ -107,6 +117,8 @@ function onFix(fix: Fix, seq: number) {
   if (ev?.type === 'start') {
     curves = new CurveDetector({ sensitivity: st().settings.sensitivity });
     stats = new RideStats();
+    height = new HeightStats();
+    track = [];
     base = null;
     newCurves = [];
     // deterministic id: replaying the same log rebuilds the same ride
@@ -115,25 +127,39 @@ function onFix(fix: Fix, seq: number) {
   }
 }
 
-/** Closes the active ride: final curve, too-short auto rides are dropped. */
-function closeRide(at: number, discard: boolean) {
+/**
+ * Closes the active ride: final curve, too-short auto rides are dropped. The saved numbers come
+ * from the analysis of the whole track; the track is saved for recounting / export.
+ */
+async function closeRide(at: number, discard: boolean): Promise<void> {
   const ride = activeRide();
   if (!ride) return;
   newCurves.push(...curves.flush());
   flushRide();
   const r = activeRide()!;
   const tooShort = r.mode === 'auto' && (r.distanceM < 1000 || at - r.startedAt < 120_000);
-  if (discard || tooShort) st().dropRide(r.id);
-  else {
-    st().endRide(r.id, at);
-    st().showSummary(r.id);
-  }
   st().clearUndo();
+  if (discard || tooShort) {
+    st().dropRide(r.id);
+    return;
+  }
+  const fixes = track;
+  const complete = base == null && fixes.length > 0;
+  if (complete) st().updateRide(r.id, { ...analyzeTrack(fixes, st().settings.sensitivity), hasTrack: true });
+  st().endRide(r.id, at);
+  st().showSummary(r.id);
+  if (complete) {
+    try {
+      await saveTrack(r.id, fixes);
+    } catch {
+      st().updateRide(r.id, { hasTrack: false });
+    }
+  }
 }
 
 /** Auto mode: ride ended by itself, the session keeps watching from fix `from` on. */
 function finishAutoRide(at: number, from: number) {
-  closeRide(at, false);
+  void closeRide(at, false);
   const session = st().session;
   if (session) st().setSession({ ...session, from });
   st().setPhase('watching');
@@ -181,6 +207,8 @@ function resetDetectors(mode: Session['mode']) {
   rideDetector = new RideDetector(mode === 'manual' ? MANUAL_START : { pauseMinutes: st().settings.pauseMinutes });
   curves = new CurveDetector({ sensitivity: st().settings.sensitivity });
   stats = new RideStats();
+  height = new HeightStats();
+  track = [];
   lastFix = null;
   newCurves = [];
   base = null;
@@ -328,6 +356,17 @@ export async function initEngine() {
     updateNotification();
   }, 5_000);
 
+  watchTrackDeletes(useStore);
+  // recount saved rides after a detector update or when the sensitivity setting changes
+  let sens = st().settings.sensitivity;
+  useStore.subscribe((s) => {
+    if (s.settings.sensitivity !== sens) {
+      sens = s.settings.sensitivity;
+      void recountRides();
+    }
+  });
+  void recountRides();
+
   if (Capacitor.isNativePlatform()) {
     CapApp.addListener('resume', () => void pump());
     CapApp.addListener('pause', () => void flushStorage());
@@ -342,7 +381,7 @@ export async function startRide() {
 /** Big button: "Stop ride" (or "Not riding after all" while armed). */
 export async function stopRide(discard = false) {
   await pump(); // take everything recorded up to now
-  if (st().phase === 'riding') closeRide(Math.max(Date.now(), lastFix?.t ?? 0), discard);
+  if (st().phase === 'riding') await closeRide(Math.max(Date.now(), lastFix?.t ?? 0), discard);
   await endSession();
   if (source.kind === 'demo') {
     source = defaultSource();
@@ -371,4 +410,34 @@ export async function startDemo() {
 /** Tests / future sources: replace where fixes come from. Call before `initEngine`. */
 export function setSource(s: FixSource) {
   source = s;
+}
+
+let recounting: Promise<void> | null = null;
+
+/**
+ * Re-analyses finished rides whose numbers were made with an older algorithm or another
+ * sensitivity (only rides with a saved track; older rides keep their numbers).
+ */
+export function recountRides(): Promise<void> {
+  if (recounting) return recounting.then(() => recountRides());
+  recounting = (async () => {
+    for (;;) {
+      const sens = st().settings.sensitivity;
+      const ride = st().rides.find(
+        (r) => r.hasTrack && r.endedAt != null && r.id !== st().activeId && (r.algo !== ALGO_VERSION || r.sensitivity !== sens),
+      );
+      if (!ride) break;
+      const fixes = await loadTrack(ride.id);
+      if (!st().rides.some((r) => r.id === ride.id)) continue; // deleted meanwhile
+      if (!fixes || !fixes.length) {
+        st().updateRide(ride.id, { hasTrack: false });
+        continue;
+      }
+      st().updateRide(ride.id, analyzeTrack(fixes, sens));
+      await new Promise((r) => setTimeout(r, 0)); // keep the UI responsive
+    }
+  })().finally(() => {
+    recounting = null;
+  });
+  return recounting;
 }

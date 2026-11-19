@@ -76,6 +76,8 @@ export function webSource(): FixSource {
           lon: pos.coords.longitude,
           speed: pos.coords.speed != null && pos.coords.speed >= 0 ? pos.coords.speed : null,
           accuracy: pos.coords.accuracy,
+          // TODO(plan 1.10): browsers report height above the ellipsoid; geoid correction
+          alt: pos.coords.altitude ?? null,
         });
       });
     },

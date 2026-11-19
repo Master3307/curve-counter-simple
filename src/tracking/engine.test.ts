@@ -17,6 +17,21 @@ vi.mock('@capacitor/preferences', () => ({
   },
 }));
 
+// app-private files (track storage), also survive a "kill"
+const files = vi.hoisted(() => new Map<string, string>());
+vi.mock('@capacitor/filesystem', () => ({
+  Directory: { Data: 'DATA' },
+  Encoding: { UTF8: 'utf8' },
+  Filesystem: {
+    writeFile: async ({ path, data }: { path: string; data: string }) => void files.set(path, data),
+    readFile: async ({ path }: { path: string }) => {
+      if (!files.has(path)) throw new Error('not found');
+      return { data: files.get(path)! };
+    },
+    deleteFile: async ({ path }: { path: string }) => void files.delete(path),
+  },
+}));
+
 const ROUTE: Leg[] = [
   { kind: 'stop', seconds: 30 },
   { kind: 'straight', length: 500, speedKmh: 60 },
@@ -65,7 +80,10 @@ function fakeRecorder() {
 
 /** Starts the app. `fresh` = first install (empty disk); otherwise a restart after a kill. */
 async function boot(rec: ReturnType<typeof fakeRecorder>, fresh = true) {
-  if (fresh) disk.clear();
+  if (fresh) {
+    disk.clear();
+    files.clear();
+  }
   rec.listeners.clear();
   vi.resetModules();
   const store = await import('../store');
@@ -180,5 +198,72 @@ describe('engine', () => {
     expect(rec.session).toBeNull();
     expect(e.useStore.getState().phase).toBe('off');
     expect(e.useStore.getState().rides).toHaveLength(0);
+  });
+
+  it('saves the track with the ride; numbers match the live count', async () => {
+    const ride = await uninterrupted();
+    expect(ride.hasTrack).toBe(true);
+    expect(ride.algo).toBeGreaterThanOrEqual(2);
+    expect(files.has(`tracks/${ride.id}.csv`)).toBe(true);
+    const { decodeTrack } = await import('./tracks');
+    const track = decodeTrack(files.get(`tracks/${ride.id}.csv`)!);
+    expect(track.length).toBeGreaterThan(100);
+    expect(track[0].t).toBe(ride.startedAt);
+  });
+
+  it('changing the sensitivity recounts saved rides', async () => {
+    const rec = fakeRecorder();
+    const e = await boot(rec);
+    await e.startRide();
+    FIXES.forEach((f) => rec.push(f));
+    await e.pump();
+    await e.stopRide();
+    const before = e.useStore.getState().rides[0];
+    expect(before.sensitivity).toBe('normal');
+    e.useStore.getState().updateSettings({ sensitivity: 'few' });
+    await e.recountRides();
+    const after = e.useStore.getState().rides[0];
+    expect(after.sensitivity).toBe('few');
+    expect(after.id).toBe(before.id);
+    expect(after.startedAt).toBe(before.startedAt);
+    // 'few' = only curves ≥ 45°: all four curves of the route are bigger, so they stay
+    expect(after.left + after.right).toBe(4);
+  });
+
+  it('rides from an older algorithm are recounted on start', async () => {
+    const rec = fakeRecorder();
+    let e = await boot(rec);
+    await e.startRide();
+    FIXES.forEach((f) => rec.push(f));
+    await e.pump();
+    await e.stopRide();
+    const id = e.useStore.getState().rides[0].id;
+    e.useStore.getState().updateRide(id, { algo: 1, left: 99 });
+    await e.flushStorage();
+    e = await boot(rec, false);
+    await e.recountRides();
+    const r = e.useStore.getState().rides[0];
+    expect(r.left).toBe(2);
+    expect(r.algo).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a deleted ride loses its track only after the undo time is over', async () => {
+    const rec = fakeRecorder();
+    const e = await boot(rec);
+    await e.startRide();
+    FIXES.forEach((f) => rec.push(f));
+    await e.pump();
+    await e.stopRide();
+    const id = e.useStore.getState().rides[0].id;
+    e.useStore.getState().deleteRide(id);
+    await settle();
+    expect(files.has(`tracks/${id}.csv`)).toBe(true); // undo still possible
+    e.useStore.getState().undoDelete();
+    await settle();
+    expect(files.has(`tracks/${id}.csv`)).toBe(true);
+    e.useStore.getState().deleteRide(id);
+    e.useStore.getState().clearUndo();
+    await settle();
+    expect(files.has(`tracks/${id}.csv`)).toBe(false);
   });
 });

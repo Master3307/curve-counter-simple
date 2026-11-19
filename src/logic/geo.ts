@@ -9,6 +9,8 @@ export interface Fix {
   speed: number | null;
   /** horizontal accuracy in metres */
   accuracy: number;
+  /** height above sea level, m (null/missing when the GPS gave none) */
+  alt?: number | null;
 }
 
 const R = 6371008.8; // mean earth radius, m
