@@ -57,6 +57,8 @@ export interface Settings {
   textScale: TextScale;
   theme: Theme;
   haptics: boolean;
+  /** the first-start guide was shown (plan 3: max 3 screens) */
+  onboarded: boolean;
 }
 
 /**
@@ -161,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   textScale: 1,
   theme: 'system',
   haptics: true,
+  onboarded: false,
 };
 
 export const useStore = create<State>()(

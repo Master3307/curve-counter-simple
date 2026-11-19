@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore, useT } from '../store';
 import { GUIDES, guideFor, type Brand } from '../guides/guides';
 import { detectBrand, platform, runAction, type Checks, type CheckState } from '../native';
-import { setAutomatic, startDemo } from '../tracking/engine';
+import { setAutomatic, startDemo, stopRide } from '../tracking/engine';
 import { Card, confirm, Segmented, Toggle } from '../ui/components';
 import { IconAlert, IconCheck } from '../ui/icons';
 import type { Action } from '../guides/guides';
@@ -36,6 +36,8 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
   const onDeleteAll = async () => {
     if (!(await confirm(t.deleteAllConfirm, t.deleteAll, t.cancel, true))) return;
     if (!(await confirm(t.deleteAllConfirm2, t.deleteAll, t.cancel, true))) return;
+    // a running ride is thrown away first, so the recorder doesn't keep going without a ride
+    if (useStore.getState().phase !== 'off') await stopRide(true);
     useStore.getState().deleteAll();
   };
 

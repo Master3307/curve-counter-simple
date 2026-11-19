@@ -6,6 +6,7 @@ import { RidesScreen } from './screens/RidesScreen';
 import { HelpScreen } from './screens/HelpScreen';
 import { closeDialog, DialogHost } from './ui/components';
 import { RideSummary } from './ui/RideSummary';
+import { Onboarding } from './ui/Onboarding';
 import { IconHelp, IconList, IconRide } from './ui/icons';
 import { runChecks, tapFeedback, type Checks } from './native';
 import { initEngine } from './tracking/engine';
@@ -55,7 +56,10 @@ export function App() {
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  const onboarded = useStore((s) => s.settings.onboarded);
+
   if (!hydrated) return null;
+  if (!onboarded) return <Onboarding onDone={recheck} />;
 
   const problems = Object.values(checks).filter((c) => c === 'bad').length;
   const tabs: { id: Tab; label: string; icon: ReactElement }[] = [

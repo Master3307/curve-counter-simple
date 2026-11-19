@@ -85,12 +85,16 @@ export function RideScreen({ problems }: { problems: number }) {
       <div className="counters">
         <div className="counter counter-left" aria-label={`${t.left}: ${left}`}>
           <IconCurveLeft className="counter-icon" />
-          <div className="counter-num">{left}</div>
+          <div className="counter-num" key={left}>
+            {left}
+          </div>
           <div className="counter-label">{t.left}</div>
         </div>
         <div className="counter counter-right" aria-label={`${t.right}: ${right}`}>
           <IconCurveRight className="counter-icon" />
-          <div className="counter-num">{right}</div>
+          <div className="counter-num" key={right}>
+            {right}
+          </div>
           <div className="counter-label">{t.right}</div>
         </div>
       </div>

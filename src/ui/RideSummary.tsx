@@ -28,7 +28,7 @@ export function RideSummary() {
             {ride.right} <IconCurveRight />
           </span>
         </div>
-        <p className="dialog-text">{t.summaryCurves(total, ride.left, ride.right)}</p>
+        <p className="dialog-text">{t.summaryCurves(total)}</p>
         <p className="meta">
           {fmtDistance(ride.distanceM, units, lang)} · {fmtDuration((ride.endedAt ?? Date.now()) - ride.startedAt)}
         </p>

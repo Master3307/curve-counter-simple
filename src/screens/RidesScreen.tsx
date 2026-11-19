@@ -75,6 +75,8 @@ export function RidesScreen() {
       <label className={`btn btn-plain wide file-btn ${busy ? 'busy' : ''}`}>
         {t.importRide}
         <input
+          aria-hidden="true"
+          tabIndex={-1}
           type="file"
           accept=".gpx,application/gpx+xml,application/octet-stream,text/xml"
           multiple
@@ -148,26 +150,26 @@ export function RidesScreen() {
             </div>
             {r.source !== 'route' && (
               <>
-            <div>
-              <dt>{t.onTheRoad}</dt>
-              <dd>{fmtDuration((r.endedAt ?? Date.now()) - r.startedAt)}</dd>
-            </div>
-            <div>
-              <dt>{t.riding}</dt>
-              <dd>{fmtDuration(r.movingS * 1000)}</dd>
-            </div>
-            <div>
-              <dt>{t.avgSpeed}</dt>
-              <dd>
-                {fmtSpeed(r.avgSpeed, units)} {speedUnit(units)}
-              </dd>
-            </div>
-            <div>
-              <dt>{t.topSpeed}</dt>
-              <dd>
-                {fmtSpeed(r.topSpeed, units)} {speedUnit(units)}
-              </dd>
-            </div>
+                <div>
+                  <dt>{t.onTheRoad}</dt>
+                  <dd>{fmtDuration((r.endedAt ?? Date.now()) - r.startedAt)}</dd>
+                </div>
+                <div>
+                  <dt>{t.riding}</dt>
+                  <dd>{fmtDuration(r.movingS * 1000)}</dd>
+                </div>
+                <div>
+                  <dt>{t.avgSpeed}</dt>
+                  <dd>
+                    {fmtSpeed(r.avgSpeed, units)} {speedUnit(units)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.topSpeed}</dt>
+                  <dd>
+                    {fmtSpeed(r.topSpeed, units)} {speedUnit(units)}
+                  </dd>
+                </div>
               </>
             )}
           </dl>

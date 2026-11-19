@@ -16,6 +16,7 @@ import { fileHash, GpxError, overlaps, parseGpx, prepareImport, writeGpx } from 
 import { STRINGS } from '../i18n/strings';
 import { useStore, type Ride } from '../store';
 import { confirm } from '../ui/components';
+import { fmtDate, fmtTime } from '../ui/format';
 import { loadTrack, saveTrack } from './tracks';
 import { Inbox } from './plugin';
 
@@ -97,7 +98,9 @@ export async function importFiles(files: File[]): Promise<number> {
     const dup = st().rides.find(
       (r) => r.fileHash === hash || (prep.kind === 'ride' && r.source !== 'route' && overlaps(r, { startedAt, endedAt })),
     );
-    if (dup && !(await confirm(t.importDuplicate(dup.sourceName ?? name), t.keepBoth, t.skip))) continue;
+    const lang = st().settings.lang;
+    const when = dup ? `${fmtDate(dup.startedAt, lang)}, ${fmtTime(dup.startedAt, lang)}` : '';
+    if (dup && !(await confirm(t.importDuplicate(when), t.keepBoth, t.skip))) continue;
 
     const a = analyzeTrack(prep.fixes, st().settings.sensitivity);
     const ride: Ride = {

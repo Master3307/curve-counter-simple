@@ -64,3 +64,18 @@ export const IconAlert = (p: SVGProps<SVGSVGElement>) => (
     <path d="M12 10v5M12 18v.01" />
   </svg>
 );
+
+export const IconPin = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+  </svg>
+);
+
+export const IconBattery = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="3" y="7" width="16" height="10" rx="2.5" />
+    <path d="M22 10.5v3" />
+    <path d="M7 10.5v3M10.5 10.5v3M14 10.5v3" />
+  </svg>
+);

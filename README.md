@@ -1,13 +1,14 @@
 # Simple Curve Counter
 
-A dead-simple motorcycle app (German / English) that counts your **left curves, right curves
+A dead-simple motorcycle app (German first, English optional) that counts your **left curves, right curves
 and the total** for every ride, along with ride time, distance and speed.
 Made to be understood by anyone: big numbers, big buttons, plain words.
 
-> **Status: early version (v0.1).** The UI, the curve/ride detection logic (with tests) and
-> the build pipelines are in place. **Android** records the ride natively in the background
-> (screen off, app killed → the ride is rebuilt from the recorded GPS log). **iPhone and the
-> browser** still only count while the app is open, until the native iOS recorder exists.
+> **Status: v0.9 beta.** **Android** is complete for everyday use: it records rides natively
+> in the background (screen off; app killed → the ride is rebuilt from the GPS log), and has the
+> setup check, ride details, height and GPX export/import. **iPhone and the browser** still only
+> count while the app is open, until the native iOS recorder exists. Numbers are tuned on
+> synthetic tracks; real ground-truth rides come next (see "Accuracy").
 
 ## How it works
 
@@ -15,7 +16,20 @@ Made to be understood by anyone: big numbers, big buttons, plain words.
 2. Ride off. The ride (and its clock) only starts once you're **actually moving**
    (≥ 15 km/h for 5 s), so putting on your helmet doesn't count.
 3. The app counts every curve: **↰ left**, **↱ right**, and the **total**.
-4. Press **Stop ride**. The ride is saved under **My rides**, where you can delete it again (with undo).
+4. Press **Stop ride**. A summary card shows the curves, distance and time. The ride is saved
+   under **My rides**, where you can delete it again (with undo).
+
+The first start asks for at most three things, one screen each (location, battery, notifications).
+
+## What you get per ride
+
+- **Left / right / total curves**, ride time, riding time, distance, average and top speed.
+- Behind **Details** (hidden by default, so the app stays simple): curves per 100 km, curve
+  strength classes (gentle / medium / tight / hairpin), every curve with angle, speed and
+  approximate lean angle, the strongest curve, highest point, climb / descent and a height profile.
+- **GPX**: save one or all rides as GPX files (share sheet), import GPX files from other apps
+  (BMW Motorrad Connected, calimoto, Kurviger, Garmin …) via the button or "Share to / Open with".
+  Planned routes without times get their curves counted too.
 
 *Experimental:* in **Help → Settings** the app can detect rides by itself (start and end).
 It's off by default because it can't tell a motorcycle from a car or bus yet.
@@ -30,13 +44,21 @@ needs no calibration. Reference implementation: [`src/logic/curves.ts`](src/logi
 - Heading change per step, summed over a sliding 100 m window = "how hard are we turning".
 - A small state machine opens a curve when turning starts, splits S-bends into two curves
   and closes the curve when the road is straight again.
+- A second pass with a 500 m window finds **wide motorway sweepers**; a curve found by both
+  passes counts once. What counts as *one* curve is written down in `curves.ts` and tested.
 - A curve counts if it turns at least **20° / 30° / 45°** (setting: *gentle bends too /
   normal / only real curves*) and its slowest point is ≥ 15 km/h (so junctions don't count).
 - Hairpins and roundabouts count as one curve. Every curve stores its angle and its
   entry / apex / average / exit speed.
 
-Planned for "insanely accurate": gyro + GPS sensor fusion, a post-ride re-analysis over the
-whole track, and a ground-truth test set of real rides checked in CI.
+Every ride keeps its track, so saved rides are **recounted automatically** when the detector
+improves or the sensitivity setting changes. Radius, cornering g and the approximate lean angle
+come from the curve's real turning length and speed (`curveMetrics.ts`).
+
+### Accuracy
+
+Planned for "insanely accurate": gyro + GPS sensor fusion, forward-backward smoothing of the
+whole track, map matching, and a ground-truth test set of ≥ 20 real rides checked in CI.
 
 ## Keeping it running in the background
 
@@ -54,7 +76,7 @@ for the APK, macOS + Xcode for iOS.
 ```bash
 pnpm install
 pnpm dev          # run in the browser (Help → "Simulate a test ride" plays a fake ride)
-pnpm test         # unit tests (curve + ride detection, guides, formatting)
+pnpm test         # unit tests (detector, engine incl. app-kill rebuild, height, GPX, guides …)
 pnpm apk          # build release APK → dist-apk/SimpleCurveCounter-vX.Y.Z.apk
 pnpm apk:install  # install on a connected phone / emulator via adb
 pnpm sync:ios && pnpm ios:open   # open the iOS project in Xcode (macOS)
@@ -64,13 +86,16 @@ pnpm sync:ios && pnpm ios:open   # open the iOS project in Xcode (macOS)
 
 ```
 src/
-  logic/        curves.ts (curve detector) · rideDetector.ts · rideStats.ts · geo.ts · simulate.ts
-  tracking/     engine.ts (fix log → detectors → store) · source.ts (native / web GPS / demo) · plugin.ts (native API)
-android/app/src/main/java/…/tracking/   RecorderService (foreground GPS service) · FixLog · RecorderPlugin
+  logic/        curves.ts (curve detector) · curveMetrics.ts (radius, g, lean) · analyze.ts (whole-track
+                analysis) · height.ts · gpx.ts · rideDetector.ts · rideStats.ts · geo.ts · simulate.ts
+  tracking/     engine.ts (fix log → detectors → store) · source.ts (native / web GPS / demo) ·
+                tracks.ts (track files) · gpxIo.ts (export / import) · plugin.ts (native API)
   guides/       per-brand "keep the app alive" guides (de/en)
   screens/      Ride · My rides · Help
-  ui/           components, icons, formatting
+  ui/           components, ride details, summary, first start, icons, formatting
   i18n/         German + English strings
+android/app/src/main/java/…/tracking/   RecorderService (foreground GPS) · FixLog · RecorderPlugin ·
+                SetupPlugin (permission check, vendor pages) · InboxPlugin (files shared to the app)
 android/ ios/   Capacitor native projects
 ```
 
