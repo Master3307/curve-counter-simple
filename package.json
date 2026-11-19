@@ -1,5 +1,5 @@
 {
-  "name": "simple-curve-tracker",
+  "name": "simple-curve-counter",
   "private": true,
   "version": "0.1.0",
   "description": "Simple Curve Counter – counts left and right curves per motorcycle ride (German / English).",
