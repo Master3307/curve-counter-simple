@@ -1,8 +1,8 @@
 {
   "name": "curve-counter-simple",
   "private": true,
-  "version": "0.9.0",
-  "description": "Curve Counter Simple \u2013 counts left and right curves per ride (German / English).",
+  "version": "1.0.0",
+  "description": "Curve Counter Simple – counts left and right curves per ride (German / English).",
   "author": "Master3307",
   "type": "module",
   "scripts": {
