@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore, useT } from '../store';
 import { startRide, stopRide } from '../tracking/engine';
 import { confirm } from '../ui/components';
+import { startGuard } from '../ui/SetupCheck';
 import { fmtDistance, fmtDuration, fmtSpeed, speedUnit } from '../ui/format';
 import { IconAlert, IconCurveLeft, IconCurveRight } from '../ui/icons';
 import { tapFeedback } from '../native';
@@ -38,7 +39,7 @@ export function RideScreen({ problems }: { problems: number }) {
       if (await confirm(t.stopConfirm, t.stop, t.cancel, true)) stopRide();
     } else if (phase === 'armed') {
       stopRide();
-    } else {
+    } else if (await startGuard(() => setTab('help'))) {
       startRide();
     }
   };

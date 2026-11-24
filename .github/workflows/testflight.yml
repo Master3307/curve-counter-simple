@@ -2,7 +2,7 @@ name: TestFlight
 
 # Builds the iOS app and uploads it to App Store Connect → TestFlight.
 # Needs a paid Apple Developer account, the app created in App Store Connect
-# (bundle ID com.korbi.simplecurvecounter) and these repository secrets:
+# (bundle ID com.korbi.curvecountersimple) and these repository secrets:
 #   ASC_KEY_ID       App Store Connect API key ID
 #   ASC_ISSUER_ID    API key issuer ID
 #   ASC_KEY_P8       contents of AuthKey_XXXX.p8, base64-encoded

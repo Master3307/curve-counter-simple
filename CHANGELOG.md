@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.0 – 2026-11-24
+
+**New name: Curve Counter Simple** – new app ID (`com.korbi.curvecountersimple`) and a new signing
+key, so it installs next to the old "Simple Curve Counter". Move your rides over with GPX export → import.
+
+Curve detection (tuned and checked on real rides, see docs/curve-detection.md)
+- Sharp 90° junction corners and U-turns are no longer thrown away as "GPS glitches".
+- Slow turns count (bus at a junction, into a driveway or parking lot); a stop at a traffic light
+  inside a curve no longer cancels it.
+- No more curves from GPS jitter while standing; after a long stop, movement must be confirmed.
+- Three sources fused with trust levels: GPS position, GPS direction of travel and the gyroscope
+  ("invisible compass", works with the phone in a pocket or flat on the dash, calibrates itself).
+- S-bends with a big and a small half are split; long even sweepers are not; lane changes,
+  overtakes and bus bays are removed after the ride. Every curve gets a confidence.
+- Saved rides are recounted automatically.
+
+New
+- Map for every ride (preview, full screen, zoom, tap curves or any point of the track).
+- Routes: rides with the same start and end, variants for other roads, merging with a distance check.
+- Export / import GPX, KML, KMZ, CSV, GeoJSON; share with a rendered map picture; expert options;
+  guides for Strava, Garmin, Komoot, AllTrails, Google Maps / My Maps, Google Earth, Gaia GPS, Wahoo,
+  Suunto, BMW, calimoto / Kurviger. Extra data from files (heart rate, waypoints …) is shown.
+- Ride details: braking / acceleration, stops, phone holder, measured tilt, sensors used.
+- Settings and Help are separate tabs; swipe between tabs; About section.
+- Setup check with severity, "can I skip this?", more checks (location off, background restricted,
+  power saving, phone-maker autostart); warning before a ride when something important is missing.
+- New first start (welcome + language, green tick after each step).
+- Battery modes (accurate / normal / saver); ride shown on Wear OS watches.
+- Undo for every destructive action (delete, delete all, import, routes, sensitivity).
+- New icon (always dark, Android 13 themed icon, iOS dark / tinted), calm mountain scenery,
+  simpler German and English texts.
+
 ## 0.9.0 – 2026-11-19
 
 **German first.** The app starts in German with km/h on every phone; English and miles can be

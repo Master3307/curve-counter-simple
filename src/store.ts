@@ -3,6 +3,9 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import { Preferences } from '@capacitor/preferences';
 import type { Curve, Sensitivity } from './logic/curves';
 import type { HeightTotals } from './logic/height';
+import type { MotionStats } from './logic/motion';
+import type { RideExtras } from './logic/gpx';
+import type { Shape } from './logic/routes';
 import { DEFAULT_LANG, STRINGS, type Lang } from './i18n/strings';
 
 export interface Ride {
@@ -22,7 +25,11 @@ export interface Ride {
   curves: Curve[];
   /** height meter (plan 1.10); null/missing when the GPS gave no height */
   height?: HeightTotals | null;
-  /** the track file exists (tracks.ts) → can be recounted and exported */
+  /** braking / acceleration, stops, phone holder, tilt */
+  motion?: MotionStats | null;
+  /** small outline of the track (map previews, routes) */
+  shape?: Shape;
+  /** the track file exists (tracks.ts) → can be recounted, shown on the map and exported */
   hasTrack?: boolean;
   /** analysis version and sensitivity the saved numbers were made with */
   algo?: number;
@@ -34,6 +41,17 @@ export interface Ride {
   fileHash?: string;
   /** 'approx' = imported with few points */
   quality?: 'good' | 'approx';
+  /** everything else an imported file carried (description, heart rate, waypoints …) */
+  extras?: RideExtras;
+  /** own name given by the user */
+  name?: string;
+}
+
+/** Rides from the same start to the same end (logic/routes.ts). */
+export interface Route {
+  id: string;
+  name: string;
+  rideIds: string[];
 }
 
 /**
@@ -43,10 +61,13 @@ export interface Ride {
  * riding   – ride running
  */
 export type Phase = 'off' | 'watching' | 'armed' | 'riding';
-export type Tab = 'ride' | 'rides' | 'help';
+export type Tab = 'ride' | 'rides' | 'settings' | 'help';
+export const TABS: Tab[] = ['ride', 'rides', 'settings', 'help'];
 export type TextScale = 1 | 1.15 | 1.3;
 export type Units = 'metric' | 'imperial';
 export type Theme = 'system' | 'light' | 'dark';
+/** max = most accurate (GPS 1 s + sensors 50 Hz) · balanced · saver (GPS 2 s, no sensors) */
+export type Power = 'max' | 'balanced' | 'saver';
 
 export interface Settings {
   lang: Lang;
@@ -57,8 +78,15 @@ export interface Settings {
   textScale: TextScale;
   theme: Theme;
   haptics: boolean;
-  /** the first-start guide was shown (plan 3: max 3 screens) */
+  power: Power;
+  /** show the running ride on a smart watch (Android: extra notification) */
+  watch: boolean;
+  /** calm background picture with slow movement */
+  scenery: boolean;
+  /** the first-start guide was shown */
   onboarded: boolean;
+  /** steps the app can't check by itself, confirmed by the user ("I did it") */
+  confirmed: string[];
 }
 
 /**
@@ -85,8 +113,17 @@ export interface Live {
   noGps: boolean;
 }
 
-interface State {
+/** Something that can be taken back from the undo bar. */
+export interface UndoEntry {
+  text: string;
+  /** rides that are gone for now: their track files must stay until the bar is gone */
   rides: Ride[];
+  restore: (s: State) => Partial<State>;
+}
+
+export interface State {
+  rides: Ride[];
+  routes: Route[];
   activeId: string | null;
   phase: Phase;
   session: Session | null;
@@ -95,8 +132,8 @@ interface State {
   live: Live;
   /** ride to show in the summary card right after it ended (not persisted) */
   summaryId: string | null;
-  /** last deleted ride, for the undo bar (not persisted) */
-  lastDeleted: { ride: Ride; index: number } | null;
+  /** last undoable action (not persisted) */
+  undo: UndoEntry | null;
   hydrated: boolean;
 
   setTab(tab: Tab): void;
@@ -107,23 +144,26 @@ interface State {
   updateRide(id: string, patch: Partial<Ride>): void;
   addCurves(id: string, curves: Curve[]): void;
   endRide(id: string, endedAt: number): void;
-  /** Adds a finished ride (import), sorted in by start time. */
+  /** Adds finished rides (import), sorted in by start time. */
   addRide(ride: Ride): void;
   deleteRide(id: string): void;
   /** Removes a ride without offering undo (used when the engine rebuilds a running ride). */
   dropRide(id: string): void;
+  /** Takes back the last action. */
   undoDelete(): void;
   clearUndo(): void;
+  /** Offers an undo bar for any action. */
+  offerUndo(entry: UndoEntry): void;
   showSummary(id: string | null): void;
   deleteAll(): void;
   updateSettings(patch: Partial<Settings>): void;
+  setRoutes(routes: Route[], undoText?: string): void;
 }
 
 /**
  * Writes are debounced (at most one per second, the latest state wins), so saving never slows
  * down counting. Nothing is lost on a crash: the raw fixes are in the recorder's log, and the
  * running ride is rebuilt from it on the next start.
- * TODO(milestone 2b): SQLite instead of one JSON blob, once there are many rides.
  */
 const pending = new Map<string, string>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,25 +198,32 @@ export const DEFAULT_SETTINGS: Settings = {
   auto: false,
   sensitivity: 'normal',
   pauseMinutes: 10,
-  /** European default; miles can be picked in Help */
+  /** European default; miles can be picked in Settings */
   units: 'metric',
   textScale: 1,
   theme: 'system',
   haptics: true,
+  power: 'balanced',
+  watch: true,
+  scenery: true,
   onboarded: false,
+  confirmed: [],
 };
+
+const tr = () => STRINGS[useStore.getState().settings.lang];
 
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
       rides: [],
+      routes: [],
       activeId: null,
       phase: 'off',
       session: null,
       settings: DEFAULT_SETTINGS,
       tab: 'ride',
       live: { speed: 0, gpsWeak: false, demo: false, problem: null, noGps: false },
-      lastDeleted: null,
+      undo: null,
       summaryId: null,
       hydrated: false,
 
@@ -223,12 +270,22 @@ export const useStore = create<State>()(
         set({ activeId: null, phase: get().settings.auto ? 'watching' : 'off' });
       },
       deleteRide(id) {
-        const rides = get().rides;
+        const { rides, routes } = get();
         const index = rides.findIndex((r) => r.id === id);
         if (index < 0) return;
+        const ride = rides[index];
         set({
           rides: rides.filter((r) => r.id !== id),
-          lastDeleted: { ride: rides[index], index },
+          routes: routes.map((x) => ({ ...x, rideIds: x.rideIds.filter((i) => i !== id) })).filter((x) => x.rideIds.length),
+          undo: {
+            text: tr().deleted,
+            rides: [ride],
+            restore: (s) => {
+              const list = [...s.rides];
+              list.splice(Math.min(index, list.length), 0, ride);
+              return { rides: list, routes };
+            },
+          },
           ...(get().activeId === id ? { activeId: null, phase: get().settings.auto ? 'watching' : 'off' } : {}),
         });
       },
@@ -239,26 +296,38 @@ export const useStore = create<State>()(
         set({ rides: get().rides.filter((r) => r.id !== id), ...(get().activeId === id ? { activeId: null } : {}) });
       },
       undoDelete() {
-        const d = get().lastDeleted;
-        if (!d) return;
-        const rides = [...get().rides];
-        rides.splice(d.index, 0, d.ride);
-        set({ rides, lastDeleted: null });
+        const u = get().undo;
+        if (!u) return;
+        set({ ...u.restore(get()), undo: null });
       },
-      clearUndo: () => set({ lastDeleted: null }),
+      clearUndo: () => set({ undo: null }),
+      offerUndo: (undo) => set({ undo }),
       showSummary: (summaryId) => set({ summaryId }),
-      deleteAll: () =>
-        set({ rides: [], activeId: null, lastDeleted: null, phase: get().settings.auto ? 'watching' : 'off' }),
+      deleteAll() {
+        const { rides, routes, activeId } = get();
+        const kept = rides.filter((r) => r.id === activeId);
+        const gone = rides.filter((r) => r.id !== activeId);
+        set({
+          rides: kept,
+          routes: [],
+          undo: { text: tr().deletedAll, rides: gone, restore: (s) => ({ rides: [...s.rides, ...gone].sort((a, b) => b.startedAt - a.startedAt), routes }) },
+        });
+      },
       updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
+      setRoutes(routes, undoText) {
+        const before = get().routes;
+        set({ routes, ...(undoText ? { undo: { text: undoText, rides: [], restore: () => ({ routes: before }) } } : {}) });
+      },
     }),
     {
       name: 'curve-tracker',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => prefsStorage),
-      partialize: (s) => ({ rides: s.rides, activeId: s.activeId, phase: s.phase, session: s.session, settings: s.settings }),
+      partialize: (s) => ({ rides: s.rides, routes: s.routes, activeId: s.activeId, phase: s.phase, session: s.session, settings: s.settings }),
+      migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
-        return { ...current, ...p, settings: { ...DEFAULT_SETTINGS, ...p.settings } };
+        return { ...current, ...p, routes: p.routes ?? [], settings: { ...DEFAULT_SETTINGS, ...p.settings } };
       },
       onRehydrateStorage: () => () => useStore.setState({ hydrated: true }),
     },
@@ -266,3 +335,6 @@ export const useStore = create<State>()(
 );
 
 export const useT = () => STRINGS[useStore((s) => s.settings.lang)];
+
+/** Display name of a ride. */
+export const rideName = (r: Ride) => r.name ?? r.sourceName ?? null;

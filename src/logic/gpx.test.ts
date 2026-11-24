@@ -22,7 +22,7 @@ describe('GPX', () => {
     expect(xml).toContain('<type>curve</type>');
     const parsed = parseGpx(xml);
     expect(parsed.name).toBe('Test & <ride>');
-    expect(parsed.creator).toBe('Simple Curve Counter');
+    expect(parsed.creator).toBe('Curve Counter Simple');
     const prep = prepareImport(parsed);
     expect(prep.kind).toBe('ride');
     expect(prep.quality).toBe('good');

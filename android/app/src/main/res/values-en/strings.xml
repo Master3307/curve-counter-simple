@@ -2,5 +2,6 @@
 <!-- English. German is the default (values/), so every non-English phone gets German. -->
 <resources>
     <string name="notification_channel">Ride</string>
+    <string name="notification_channel_watch">Ride on your watch</string>
     <string name="notification_recording">Ride is being recorded</string>
 </resources>

@@ -3,7 +3,8 @@
  * private storage. Needed for recounting (better algorithm / other sensitivity), the height
  * profile and GPX export.
  *
- * Format: CSV, one fix per line: t,lat,lon,speed,accuracy,alt (empty = unknown).
+ * Format: CSV, one fix per line: t,lat,lon,speed,accuracy,alt,bearing,yaw,gx,gy,gz
+ * (empty = unknown; files from older versions simply have fewer columns).
  * TODO(milestone 2b): move into SQLite together with the rides; delete raw fixes after 30 days
  * (optional setting, counts stay).
  */
@@ -14,9 +15,20 @@ import type { useStore as Store } from '../store';
 const path = (id: string) => `tracks/${id}.csv`;
 const num = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? '' : String(v));
 
+const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
 export function encodeTrack(fixes: Fix[]): string {
-  return fixes.map((f) => `${f.t},${f.lat},${f.lon},${num(f.speed)},${f.accuracy},${num(f.alt)}`).join('\n');
+  return fixes
+    .map((f) => {
+      const base = `${f.t},${f.lat},${f.lon},${num(f.speed)},${f.accuracy},${num(f.alt)}`;
+      if (f.bearing == null && f.yaw == null && !f.g) return base;
+      const g = f.g ? f.g.map(r4).join(',') : ',,';
+      return `${base},${num(f.bearing)},${num(f.yaw == null ? null : r4(f.yaw))},${g}`;
+    })
+    .join('\n');
 }
+
+const opt = (v: string | undefined) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 
 export function decodeTrack(csv: string): Fix[] {
   const out: Fix[] = [];
@@ -25,14 +37,14 @@ export function decodeTrack(csv: string): Fix[] {
     if (p.length < 5) continue;
     const [t, lat, lon, accuracy] = [Number(p[0]), Number(p[1]), Number(p[2]), Number(p[4])];
     if (![t, lat, lon, accuracy].every(Number.isFinite)) continue;
-    out.push({
-      t,
-      lat,
-      lon,
-      speed: p[3] === '' ? null : Number(p[3]),
-      accuracy,
-      alt: p[5] == null || p[5] === '' ? null : Number(p[5]),
-    });
+    const f: Fix = { t, lat, lon, speed: opt(p[3]), accuracy, alt: opt(p[5]) };
+    const bearing = opt(p[6]);
+    const yaw = opt(p[7]);
+    const g = [opt(p[8]), opt(p[9]), opt(p[10])];
+    if (bearing != null) f.bearing = bearing;
+    if (yaw != null) f.yaw = yaw;
+    if (g.every((x) => x != null)) f.g = g as [number, number, number];
+    out.push(f);
   }
   return out;
 }
@@ -61,7 +73,7 @@ export async function deleteTrack(id: string): Promise<void> {
 export function watchTrackDeletes(store: typeof Store) {
   const known = (s: ReturnType<typeof store.getState>) => {
     const ids = new Set(s.rides.filter((r) => r.hasTrack).map((r) => r.id));
-    if (s.lastDeleted?.ride.hasTrack) ids.add(s.lastDeleted.ride.id);
+    for (const r of s.undo?.rides ?? []) if (r.hasTrack) ids.add(r.id);
     return ids;
   };
   let prev = known(store.getState());

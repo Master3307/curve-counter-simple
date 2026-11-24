@@ -22,7 +22,7 @@ android {
     namespace = "com.korbi.simplecurvecounter"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.korbi.simplecurvecounter"
+        applicationId "com.korbi.curvecountersimple"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode

@@ -26,6 +26,8 @@ export type Action =
   | 'notifications'
   | 'batteryUnrestricted'
   | 'appSettings'
+  | 'locationServices'
+  | 'powerSave'
   | 'xiaomiAutostart'
   | 'huaweiAppLaunch'
   | 'honorAppLaunch'
@@ -88,8 +90,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Samsung: Tippe auf „Öffnen“. Dann „Nie in Standby versetzte Apps“ → „+“ → „Simple Curve Counter“.',
-          en: 'Samsung: Tap "Open". Then "Never sleeping apps" → "+" → "Simple Curve Counter".',
+          de: 'Samsung: Tippe auf „Öffnen“. Dann „Nie in Standby versetzte Apps“ → „+“ → „Curve Counter Simple“.',
+          en: 'Samsung: Tap "Open". Then "Never sleeping apps" → "+" → "Curve Counter Simple".',
         },
         action: 'samsungNeverSleeping',
       },
@@ -102,8 +104,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'Autostart: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ EIN.',
-          en: 'Autostart: Tap "Open". Switch "Simple Curve Counter" ON.',
+          de: 'Autostart: Tippe auf „Öffnen“. Schalte „Curve Counter Simple“ EIN.',
+          en: 'Autostart: Tap "Open". Switch "Curve Counter Simple" ON.',
         },
         action: 'xiaomiAutostart',
       },
@@ -116,8 +118,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ AUS. Im Fenster dann alle 3 Schalter EIN.',
-          en: 'App launch: Tap "Open". Switch "Simple Curve Counter" OFF. Then switch all 3 options ON in the window.',
+          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Curve Counter Simple“ AUS. Im Fenster dann alle 3 Schalter EIN.',
+          en: 'App launch: Tap "Open". Switch "Curve Counter Simple" OFF. Then switch all 3 options ON in the window.',
         },
         action: 'huaweiAppLaunch',
       },
@@ -130,8 +132,8 @@ export const GUIDES: Guide[] = [
       ...ANDROID_BASE,
       {
         text: {
-          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Simple Curve Counter“ AUS. Im Fenster dann alle 3 Schalter EIN.',
-          en: 'App launch: Tap "Open". Switch "Simple Curve Counter" OFF. Then switch all 3 options ON in the window.',
+          de: 'App-Start: Tippe auf „Öffnen“. Schalte „Curve Counter Simple“ AUS. Im Fenster dann alle 3 Schalter EIN.',
+          en: 'App launch: Tap "Open". Switch "Curve Counter Simple" OFF. Then switch all 3 options ON in the window.',
         },
         action: 'honorAppLaunch',
       },

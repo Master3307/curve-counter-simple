@@ -1,7 +1,10 @@
 /** Big card right after a ride ended: "You rode 143 curves (71 ↰ / 72 ↱), 48.3 km, 1:23 h". */
+import { useState } from 'react';
 import { useStore, useT } from '../store';
 import { fmtDistance, fmtDuration } from './format';
 import { IconCurveLeft, IconCurveRight } from './icons';
+import { MapPreview } from './Map';
+import { ShareSheet } from './Share';
 import { tapFeedback } from '../native';
 
 export function RideSummary() {
@@ -9,6 +12,7 @@ export function RideSummary() {
   const id = useStore((s) => s.summaryId);
   const ride = useStore((s) => s.rides.find((r) => r.id === id) ?? null);
   const { units, lang } = useStore((s) => s.settings);
+  const [share, setShare] = useState(false);
   if (!ride) return null;
   const close = () => {
     tapFeedback();
@@ -19,6 +23,7 @@ export function RideSummary() {
     <div className="scrim" onClick={close}>
       <div className="dialog summary" role="dialog" aria-modal="true" aria-label={t.summaryTitle} onClick={(e) => e.stopPropagation()}>
         <h2>{t.summaryTitle}</h2>
+        {ride.shape && <MapPreview shape={ride.shape} curves={ride.curves} />}
         <div className="lr-row big">
           <span className="lr lr-left">
             <IconCurveLeft /> {ride.left}
@@ -32,10 +37,17 @@ export function RideSummary() {
         <p className="meta">
           {fmtDistance(ride.distanceM, units, lang)} · {fmtDuration((ride.endedAt ?? Date.now()) - ride.startedAt)}
         </p>
+        <p className="hint">{t.summaryChecked}</p>
         <button className="btn btn-go btn-huge" onClick={close}>
           {t.ok}
         </button>
+        {ride.hasTrack && (
+          <button className="btn btn-link" onClick={() => setShare(true)}>
+            {t.share}
+          </button>
+        )}
       </div>
+      {share && <ShareSheet rides={[ride]} mode="share" onClose={() => setShare(false)} />}
     </div>
   );
 }

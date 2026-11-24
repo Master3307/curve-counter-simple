@@ -9,6 +9,10 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
+import android.app.ActivityManager;
+import android.hardware.Sensor;
+import android.hardware.SensorManager;
+import android.location.LocationManager;
 import android.provider.Settings;
 
 import androidx.core.app.ActivityCompat;
@@ -50,6 +54,16 @@ public class SetupPlugin extends Plugin {
         r.put("notifications", NotificationManagerCompat.from(c).areNotificationsEnabled());
         r.put("battery", pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName()));
         r.put("manufacturer", Build.MANUFACTURER);
+        // GPS switched off in the quick settings: nothing can be recorded at all
+        LocationManager lm = (LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
+        boolean locOn = lm != null && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? lm.isLocationEnabled() : lm.isProviderEnabled(LocationManager.GPS_PROVIDER));
+        r.put("locationOn", locOn);
+        r.put("powerSave", pm != null && pm.isPowerSaveMode());
+        // "Background usage: Restricted" (Android 9+) stops the app even with everything else right
+        ActivityManager am = (ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
+        r.put("backgroundRestricted", Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && am != null && am.isBackgroundRestricted());
+        SensorManager sm = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE);
+        r.put("gyro", sm != null && sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null);
         call.resolve(r);
     }
 
@@ -70,6 +84,12 @@ public class SetupPlugin extends Plugin {
                     resolve(call, true);
                     return;
                 }
+                break;
+            case "locationServices":
+                tries.add(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                break;
+            case "powerSave":
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) tries.add(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS));
                 break;
             case "notifications":
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 13+ themed icon: the road only, coloured by the system. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:pivotX="256" android:pivotY="256" android:scaleX="0.6" android:scaleY="0.6">
+        <path
+            android:pathData="M182 540 C182 380 342 392 342 274 C342 168 194 176 194 -30"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="96" />
+    </group>
+</vector>

@@ -79,3 +79,44 @@ export const IconBattery = (p: SVGProps<SVGSVGElement>) => (
     <path d="M7 10.5v3M10.5 10.5v3M14 10.5v3" />
   </svg>
 );
+
+export const IconSettings = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+    <circle cx="16" cy="7" r="2.3" />
+    <circle cx="10" cy="17" r="2.3" />
+  </svg>
+);
+
+export const IconShare = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 15V3M7.5 7.5 12 3l4.5 4.5" />
+    <path d="M5 12v7.5h14V12" />
+  </svg>
+);
+
+/**
+ * The app logo: a bold amber winding road on a dark tile, mountains behind. Same drawing as
+ * assets/src/icon.svg (the launcher icon).
+ */
+export const AppIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 512 512" role="img" aria-label="Curve Counter Simple">
+    <defs>
+      <radialGradient id="ai-bg" cx="30%" cy="20%" r="95%">
+        <stop offset="0" stopColor="#2b2f38" />
+        <stop offset="1" stopColor="#121418" />
+      </radialGradient>
+      <clipPath id="ai-clip">
+        <rect width="512" height="512" rx="112" />
+      </clipPath>
+    </defs>
+    <g clipPath="url(#ai-clip)">
+      <rect width="512" height="512" fill="url(#ai-bg)" />
+      <path d="M0 318 L96 214 L150 262 L246 150 L332 252 L396 196 L512 300 V512 H0Z" fill="#2c313b" />
+      <path d="M246 150 L222 178 L246 172 L262 190 Z M96 214 L80 232 L98 228 L108 238 Z" fill="#555c69" />
+      <path d="M182 540 C182 380 342 392 342 274 C342 168 194 176 194 -30" fill="none" stroke="#0d0f12" strokeWidth="118" strokeLinecap="round" />
+      <path d="M182 540 C182 380 342 392 342 274 C342 168 194 176 194 -30" fill="none" stroke="#f2a922" strokeWidth="96" />
+      <path d="M182 540 C182 380 342 392 342 274 C342 168 194 176 194 -30" fill="none" stroke="#15171c" strokeWidth="11" strokeDasharray="30 26" />
+    </g>
+  </svg>
+);

@@ -23,9 +23,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * (Rule 1: never lose a ride). Kept in memory as well so the WebView can read it fast.
  *
  * Files (app-private): recorder/session  = session id (exists while a session is recorded)
- *                      recorder/fixes.csv = one line per fix: t,lat,lon,speed,accuracy,alt
- *                                           (speed / alt empty when the GPS gave none;
- *                                           alt = height above sea level where available)
+ *                      recorder/fixes.csv = one line per fix:
+ *                        t,lat,lon,speed,accuracy,alt,bearing,yaw,gx,gy,gz
+ *                        (empty when unknown; alt = height above sea level where available;
+ *                        bearing = Doppler course; yaw = gyro turn since the previous fix,
+ *                        degrees, + = right; g = gravity direction in phone coordinates)
  *
  * TODO(milestone 2b): Room/SQLite with ride, curve and fix tables (plan 1.5), raw fixes kept
  * after the ride for re-analysis.
@@ -81,17 +83,15 @@ public final class FixLog {
 
     private static double[] parse(String line) {
         String[] p = line.split(",", -1);
-        // 5 fields = log written by v0.2 (no height)
-        if (p.length != 5 && p.length != 6) return null;
+        // 5 fields = v0.2 (no height), 6 = v0.9 (no sensors), 11 = v1.0
+        if (p.length < 5 || p.length > 11) return null;
         try {
-            return new double[] {
-                Double.parseDouble(p[0]),
-                Double.parseDouble(p[1]),
-                Double.parseDouble(p[2]),
-                p[3].isEmpty() ? Double.NaN : Double.parseDouble(p[3]),
-                Double.parseDouble(p[4]),
-                p.length < 6 || p[5].isEmpty() ? Double.NaN : Double.parseDouble(p[5]),
-            };
+            double[] f = new double[11];
+            for (int i = 0; i < 11; i++) {
+                if (i < 3 || i == 4) f[i] = Double.parseDouble(p[i]);
+                else f[i] = i >= p.length || p[i].isEmpty() ? Double.NaN : Double.parseDouble(p[i]);
+            }
+            return f;
         } catch (NumberFormatException e) {
             return null;
         }
@@ -130,17 +130,29 @@ public final class FixLog {
         sessionFile.delete();
     }
 
-    /** @param alt height above sea level, NaN when unknown */
-    public void append(Location l, double alt) {
+    private static String n(double v) {
+        // Double.toString always uses '.', independent of the phone's language
+        return Double.isNaN(v) ? "" : Double.toString(v);
+    }
+
+    /**
+     * @param alt     height above sea level, NaN when unknown
+     * @param bearing Doppler course, NaN when unknown
+     * @param yaw     gyro turn since the previous fix (deg, + = right), NaN when unknown
+     * @param g       gravity direction (unit vector, phone coordinates), null when unknown
+     */
+    public void append(Location l, double alt, double bearing, double yaw, double[] g) {
         synchronized (this) {
             if (sessionId == null) return;
             double speed = l.hasSpeed() ? l.getSpeed() : Double.NaN;
             double acc = l.hasAccuracy() ? l.getAccuracy() : 99;
-            double[] f = {l.getTime(), l.getLatitude(), l.getLongitude(), speed, acc, alt};
+            double gx = g != null ? g[0] : Double.NaN;
+            double gy = g != null ? g[1] : Double.NaN;
+            double gz = g != null ? g[2] : Double.NaN;
+            double[] f = {l.getTime(), l.getLatitude(), l.getLongitude(), speed, acc, alt, bearing, yaw, gx, gy, gz};
             fixes.add(f);
-            // Double.toString always uses '.', independent of the phone's language
-            String line = (long) f[0] + "," + f[1] + "," + f[2] + "," + (Double.isNaN(speed) ? "" : Double.toString(speed)) + "," + acc + ","
-                + (Double.isNaN(alt) ? "" : Double.toString(alt)) + "\n";
+            String line = (long) f[0] + "," + f[1] + "," + f[2] + "," + n(speed) + "," + acc + "," + n(alt) + "," + n(bearing) + ","
+                + n(yaw) + "," + n(gx) + "," + n(gy) + "," + n(gz) + "\n";
             try {
                 if (out == null) out = new FileOutputStream(fixesFile, true);
                 out.write(line.getBytes(StandardCharsets.UTF_8));
@@ -171,6 +183,15 @@ public final class FixLog {
             o.put("accuracy", f[4]);
             if (Double.isNaN(f[5])) o.put("alt", JSONObject.NULL);
             else o.put("alt", f[5]);
+            if (!Double.isNaN(f[6])) o.put("bearing", f[6]);
+            if (!Double.isNaN(f[7])) o.put("yaw", f[7]);
+            if (!Double.isNaN(f[8]) && !Double.isNaN(f[9]) && !Double.isNaN(f[10])) {
+                try {
+                    o.put("g", new JSArray(new double[] {f[8], f[9], f[10]}));
+                } catch (org.json.JSONException ignored) {
+                    // not a number (can't happen: checked above)
+                }
+            }
             arr.put(o);
         }
         return arr;

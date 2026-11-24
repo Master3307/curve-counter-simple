@@ -1,55 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useStore, useT } from '../store';
-import { GUIDES, guideFor, type Brand } from '../guides/guides';
-import { detectBrand, platform, runAction, type Checks, type CheckState } from '../native';
-import { setAutomatic, startDemo, stopRide } from '../tracking/engine';
-import { Card, confirm, Segmented, Toggle } from '../ui/components';
-import { IconAlert, IconCheck } from '../ui/icons';
-import type { Action } from '../guides/guides';
+import { GUIDES, guideFor, type Action, type Brand } from '../guides/guides';
+import { APP_GUIDES } from '../guides/apps';
+import { runAction, type Checks } from '../native';
+import { Card, ExtLink } from '../ui/components';
+import { SetupCheck, useBrand } from '../ui/SetupCheck';
+import { AppIcon } from '../ui/icons';
+
+export const GITHUB_USER = 'https://github.com/Master3307';
+export const REPO = 'https://github.com/Master3307/curve-counter-simple';
+export const OPENUSERJS = 'https://openuserjs.org/users/MrKoby07';
 
 export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: () => void }) {
   const t = useT();
-  const s = useStore((st) => st.settings);
-  const phase = useStore((st) => st.phase);
-  const update = useStore((st) => st.updateSettings);
-  const [brand, setBrand] = useState<Brand | null>(null);
+  const lang = useStore((st) => st.settings.lang);
+  const detected = useBrand();
+  const [picked, setPicked] = useState<Brand | null>(null);
   const [picking, setPicking] = useState(false);
+  const guide = guideFor(picked ?? detected ?? 'android');
 
-  useEffect(() => {
-    detectBrand().then(setBrand);
-  }, []);
-
-  const guide = guideFor(brand ?? 'android');
   const act = async (a: Action) => {
     await runAction(a);
     onRecheck();
   };
 
-  const rows: { key: keyof Checks; label: string; why: string; action: Action; hide?: boolean }[] = [
-    { key: 'location', label: t.checkLocation, why: t.checkLocationWhy, action: 'locationAlways' },
-    { key: 'notifications', label: t.checkNotifications, why: t.checkNotificationsWhy, action: 'notifications' },
-    { key: 'battery', label: t.checkBattery, why: t.checkBatteryWhy, action: 'batteryUnrestricted', hide: platform === 'ios' },
-  ];
-  const visible = rows.filter((r) => !r.hide);
-  const allOk = visible.every((r) => checks[r.key] === 'ok');
-
-  const onDeleteAll = async () => {
-    if (!(await confirm(t.deleteAllConfirm, t.deleteAll, t.cancel, true))) return;
-    if (!(await confirm(t.deleteAllConfirm2, t.deleteAll, t.cancel, true))) return;
-    // a running ride is thrown away first, so the recorder doesn't keep going without a ride
-    if (useStore.getState().phase !== 'off') await stopRide(true);
-    useStore.getState().deleteAll();
-  };
-
   return (
     <div className="screen">
-      <h1>{t.checkTitle}</h1>
+      <h1>{t.tabHelp}</h1>
+
+      <h2>{t.checkTitle}</h2>
       <p className="hint">{t.checkHint}</p>
       <Card>
-        {visible.map((r) => (
-          <CheckRow key={r.key} state={checks[r.key]} label={r.label} why={r.why} fix={t.fix} unknown={t.checkUnknown} onFix={() => act(r.action)} />
-        ))}
-        {allOk && <p className="all-good">{t.allGood}</p>}
+        <SetupCheck checks={checks} onRecheck={onRecheck} />
+        <button className="btn btn-link" onClick={onRecheck}>
+          ↻ {t.checkAgain}
+        </button>
       </Card>
 
       <h2>{t.guideFor(guide.name)}</h2>
@@ -63,7 +48,7 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
                   {done ? '✓' : i + 1}
                 </span>
                 <div>
-                  <p>{step.text[s.lang]}</p>
+                  <p>{step.text[lang]}</p>
                   {done ? (
                     <span className="hint">{t.done}</span>
                   ) : (
@@ -88,7 +73,7 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
                 key={g.brand}
                 className={g.brand === guide.brand ? 'on' : ''}
                 onClick={() => {
-                  setBrand(g.brand);
+                  setPicked(g.brand);
                   setPicking(false);
                 }}
               >
@@ -99,114 +84,71 @@ export function HelpScreen({ checks, onRecheck }: { checks: Checks; onRecheck: (
         )}
       </Card>
 
-      <h2>{t.settings}</h2>
-      <Card>
-        <Segmented
-          label={t.language}
-          value={s.lang}
-          options={[
-            { value: 'de', label: 'Deutsch' },
-            { value: 'en', label: 'English' },
-          ]}
-          onChange={(lang) => update({ lang })}
-        />
-        <Segmented
-          label={t.sensitivity}
-          value={s.sensitivity}
-          options={[
-            { value: 'few', label: t.sensFew },
-            { value: 'normal', label: t.sensNormal },
-            { value: 'many', label: t.sensMany },
-          ]}
-          onChange={(sensitivity) => update({ sensitivity })}
-        />
-        <p className="hint">{t.sensitivityRecount}</p>
-        <Segmented
-          label={t.units}
-          value={s.units}
-          options={[
-            { value: 'metric', label: t.unitsMetric },
-            { value: 'imperial', label: t.unitsImperial },
-          ]}
-          onChange={(units) => update({ units })}
-        />
-        <Segmented
-          label={t.textSize}
-          value={s.textScale}
-          options={[
-            { value: 1, label: 'A' },
-            { value: 1.15, label: 'A+' },
-            { value: 1.3, label: 'A++' },
-          ]}
-          onChange={(textScale) => update({ textScale })}
-        />
-        <Segmented
-          label={t.theme}
-          value={s.theme}
-          options={[
-            { value: 'system', label: t.themeSystem },
-            { value: 'light', label: t.themeLight },
-            { value: 'dark', label: t.themeDark },
-          ]}
-          onChange={(theme) => update({ theme })}
-        />
-        <Toggle label={t.automatic} hint={t.automaticHint} on={s.auto} onChange={setAutomatic} />
-        {s.auto && (
-          <Segmented
-            label={t.pause}
-            value={s.pauseMinutes}
-            options={[5, 10, 20].map((n) => ({ value: n as 5 | 10 | 20, label: t.pauseMin(n) }))}
-            onChange={(pauseMinutes) => update({ pauseMinutes })}
-          />
-        )}
+      <h2>{t.faqTitle}</h2>
+      <Card className="faq">
+        {t.faq.map(([q, a], i) => (
+          <details key={i}>
+            <summary>{q}</summary>
+            <p>{a}</p>
+          </details>
+        ))}
       </Card>
 
-      <Card>
-        <button className="btn btn-plain wide" disabled={phase === 'riding'} onClick={startDemo}>
-          {t.demoRide}
-        </button>
-        <button className="btn btn-link danger" onClick={onDeleteAll}>
-          {t.deleteAll}
-        </button>
+      <h2>{t.bringTitle}</h2>
+      <p className="hint">{t.bringHint}</p>
+      <Card className="faq">
+        {APP_GUIDES.filter((a) => a.bring).map((a) => (
+          <details key={a.id}>
+            <summary>{a.name}</summary>
+            <ol className="steps small">
+              {a.bring![lang].map((s, i) => (
+                <li key={i}>
+                  <span className="step-num">{i + 1}</span>
+                  <p>{s}</p>
+                </li>
+              ))}
+            </ol>
+          </details>
+        ))}
+        <details>
+          <summary>{t.otherApps}</summary>
+          <p>{t.otherAppsText}</p>
+        </details>
       </Card>
 
-      <p className="hint">{t.placeholderNote}</p>
-      <p className="hint center">
-        {t.appName} · {t.version} {__APP_VERSION__}
-      </p>
+      <h2>{t.sendTitle}</h2>
+      <Card>
+        <p>{t.sendText}</p>
+      </Card>
+
+      <h2>{t.aboutTitle}</h2>
+      <Card className="about">
+        <div className="about-head">
+          <AppIcon className="about-icon" />
+          <div>
+            <b>{t.appName}</b>
+            <span className="hint">
+              {t.version} {__APP_VERSION__}
+            </span>
+          </div>
+        </div>
+        <p>{t.aboutText}</p>
+        <p className="about-links">
+          {t.madeBy}{' '}
+          <ExtLink href={GITHUB_USER}>Korbinian</ExtLink> (
+          <ExtLink href={OPENUSERJS}>MrKoby07</ExtLink>)
+        </p>
+        <p className="about-links">
+          <ExtLink href={GITHUB_USER}>GitHub: Master3307 ↗</ExtLink>
+          <br />
+          <ExtLink href={REPO}>{t.sourceCode} ↗</ExtLink>
+          <br />
+          <ExtLink href={`${REPO}/issues`}>{t.reportBug} ↗</ExtLink>
+        </p>
+        <p className="hint">{t.aiNote}</p>
+        <p className="hint">{t.mapCredit}</p>
+        <p className="hint">{t.placeholderNote}</p>
+      </Card>
     </div>
   );
 }
-
-function CheckRow({
-  state,
-  label,
-  why,
-  fix,
-  unknown,
-  onFix,
-}: {
-  state: CheckState;
-  label: string;
-  why: string;
-  fix: string;
-  unknown: string;
-  onFix: () => void;
-}) {
-  return (
-    <div className={`check check-${state}`}>
-      <span className="check-icon">{state === 'ok' ? <IconCheck /> : <IconAlert />}</span>
-      <span className="check-label">
-        {label}
-        {state !== 'ok' && <span className="hint">{state === 'unknown' ? unknown : why}</span>}
-      </span>
-      {state !== 'ok' && (
-        <button className="btn btn-small btn-go" onClick={onFix}>
-          {fix}
-        </button>
-      )}
-    </div>
-  );
-}
-
-

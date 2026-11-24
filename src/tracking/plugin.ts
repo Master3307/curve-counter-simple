@@ -21,7 +21,7 @@ import type { Phase, Ride } from '../store';
 
 export interface RecorderPlugin {
   /** Starts the foreground service and a fresh fix log for `sessionId`. */
-  start(options: { sessionId: string }): Promise<void>;
+  start(options: { sessionId: string; power?: string; watch?: boolean }): Promise<void>;
   /** Stops the service and deletes the log. */
   stop(): Promise<void>;
   /** Up to `limit` fixes with sequence number ≥ from (numbers start at 0). */
@@ -36,7 +36,8 @@ export const Recorder = registerPlugin<RecorderPlugin>('Recorder');
 
 /** Files opened with / shared to the app (Android). */
 export interface InboxPlugin {
-  take(): Promise<{ files: { name: string; text: string }[] }>;
+  /** data = base64 (all files, also zipped ones); text = UTF-8 (older app versions) */
+  take(): Promise<{ files: { name: string; text?: string; data?: string }[] }>;
   addListener(event: 'files', cb: () => void): Promise<{ remove(): Promise<void> }>;
 }
 

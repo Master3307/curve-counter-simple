@@ -6,14 +6,17 @@ dist-apk/
 coverage/
 *.tsbuildinfo
 
-# private planning notes
+# private planning notes / personal to-do (instructions.md = what only the owner can do)
 plan.md
+instructions.md
+scripts/tmp/
+test-data
 
 # Android signing – NEVER commit
 *.jks
 *.keystore
 keystore.properties
-android/keystore.properties
+android/keystore.properties*
 android/local.properties
 
 # iOS / App Store Connect secrets – NEVER commit

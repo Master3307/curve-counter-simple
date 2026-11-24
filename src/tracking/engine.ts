@@ -22,6 +22,7 @@ import { RideStats } from '../logic/rideStats';
 import { HeightStats } from '../logic/height';
 import { ALGO_VERSION, analyzeTrack } from '../logic/analyze';
 import { loadTrack, saveTrack, watchTrackDeletes } from './tracks';
+import { findRoute, shapeOf } from '../logic/routes';
 import { STRINGS } from '../i18n/strings';
 import { fmtDuration, fmtSpeed, speedUnit } from '../ui/format';
 import { flushStorage, useStore, type Ride, type Session } from '../store';
@@ -152,8 +153,9 @@ async function closeRide(at: number, discard: boolean): Promise<void> {
   }
   const fixes = track;
   const complete = base == null && fixes.length > 0;
-  if (complete) st().updateRide(r.id, { ...analyzeTrack(fixes, st().settings.sensitivity), hasTrack: true });
+  if (complete) st().updateRide(r.id, { ...analyzeTrack(fixes, st().settings.sensitivity), hasTrack: true, shape: shapeOf(fixes) });
   st().endRide(r.id, at);
+  if (complete) assignRoute(r.id);
   st().showSummary(r.id);
   if (complete) {
     try {
@@ -161,6 +163,26 @@ async function closeRide(at: number, discard: boolean): Promise<void> {
     } catch {
       st().updateRide(r.id, { hasTrack: false });
     }
+  }
+}
+
+/** Puts a new ride into the route with the same start and end (rides tab → routes). */
+export function assignRoute(id: string) {
+  const s = st();
+  const ride = s.rides.find((r) => r.id === id);
+  if (!ride?.shape || s.routes.some((x) => x.rideIds.includes(id))) return;
+  const route = findRoute(ride.shape, s.routes, s.rides);
+  if (route) {
+    s.setRoutes(s.routes.map((x) => (x === route ? { ...x, rideIds: [...x.rideIds, id] } : x)));
+    return;
+  }
+  // a second ride between two places that had no route yet → new route with both
+  const routed = new Set(s.routes.flatMap((x) => x.rideIds));
+  const others = s.rides.filter((r) => r.id !== id && !routed.has(r.id) && r.shape?.length);
+  const match = findRoute(ride.shape, others.map((r) => ({ id: `solo-${r.id}`, rideIds: [r.id] })), others);
+  if (match) {
+    const t = STRINGS[s.settings.lang];
+    s.setRoutes([...s.routes, { id: uid(), name: t.routeName(s.routes.length + 1), rideIds: [match.rideIds[0], id] }]);
   }
 }
 
@@ -252,7 +274,7 @@ async function beginSession(mode: Session['mode']): Promise<boolean> {
   }
   const id = uid();
   try {
-    await source.start(id);
+    await source.start(id, { power: st().settings.power, watch: st().settings.watch });
   } catch {
     st().setLive({ problem: 'noLocation' });
     return false;
@@ -486,9 +508,9 @@ export function recountRides(): Promise<void> {
         st().updateRide(ride.id, { hasTrack: false });
         continue;
       }
-      const a = analyzeTrack(fixes, sens);
+      const a = { ...analyzeTrack(fixes, sens), shape: shapeOf(fixes) };
       // planned routes have made-up times: never show time or speed numbers for them
-      st().updateRide(ride.id, ride.source === 'route' ? { ...a, movingS: 0, avgSpeed: 0, topSpeed: 0 } : a);
+      st().updateRide(ride.id, ride.source === 'route' ? { ...a, movingS: 0, avgSpeed: 0, topSpeed: 0, motion: null } : a);
       await new Promise((r) => setTimeout(r, 0)); // keep the UI responsive
     }
   })().finally(() => {

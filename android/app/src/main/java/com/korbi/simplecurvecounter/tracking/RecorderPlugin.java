@@ -32,7 +32,7 @@ public class RecorderPlugin extends Plugin {
             return;
         }
         try {
-            RecorderService.start(getContext(), id);
+            RecorderService.start(getContext(), id, call.getString("power", "balanced"), call.getBoolean("watch", true));
             call.resolve();
         } catch (Exception e) {
             call.reject("could not start recording", e);
@@ -64,7 +64,7 @@ public class RecorderPlugin extends Plugin {
         String id = log.sessionId();
         if (id != null && !RecorderService.isRunning()) {
             try {
-                RecorderService.start(getContext(), null);
+                RecorderService.start(getContext(), null, null, true);
             } catch (Exception ignored) {
             }
         }

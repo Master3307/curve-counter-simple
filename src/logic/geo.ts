@@ -11,6 +11,19 @@ export interface Fix {
   accuracy: number;
   /** height above sea level, m (null/missing when the GPS gave none) */
   alt?: number | null;
+  /**
+   * Course over ground from the GPS chip (Doppler), degrees 0–360 clockwise from north.
+   * Much less noisy than the course between two positions, but only valid while moving.
+   */
+  bearing?: number | null;
+  /**
+   * Gyroscope: how far the vehicle turned since the previous fix, degrees, + = right.
+   * Measured around the gravity axis, so it does not matter how the phone lies
+   * (mount, flat on the dash, pocket). Bias is calibrated natively while standing still.
+   */
+  yaw?: number | null;
+  /** Phone tilt: gravity direction in phone coordinates (unit vector), averaged over the fix. */
+  g?: [number, number, number] | null;
 }
 
 const R = 6371008.8; // mean earth radius, m

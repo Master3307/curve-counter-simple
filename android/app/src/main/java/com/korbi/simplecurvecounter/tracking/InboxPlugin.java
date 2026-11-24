@@ -66,7 +66,7 @@ public class InboxPlugin extends Plugin {
     }
 
     private static JSObject read(ContentResolver cr, Uri uri) {
-        String name = "ride.gpx";
+        String name = "ride";
         try (Cursor c = cr.query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
             if (c != null && c.moveToFirst() && !c.isNull(0)) name = c.getString(0);
         } catch (Exception ignored) {
@@ -82,7 +82,10 @@ public class InboxPlugin extends Plugin {
             }
             JSObject f = new JSObject();
             f.put("name", name);
-            f.put("text", new String(out.toByteArray(), StandardCharsets.UTF_8));
+            byte[] bytes = out.toByteArray();
+            // base64 so zipped files (KMZ) survive; "text" stays for older web code
+            f.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+            f.put("text", new String(bytes, StandardCharsets.UTF_8));
             return f;
         } catch (Exception e) {
             Log.w(TAG, "could not read " + uri, e);

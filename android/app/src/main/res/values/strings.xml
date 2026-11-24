@@ -1,9 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Simple Curve Counter</string>
-    <string name="title_activity_main">Simple Curve Counter</string>
-    <string name="package_name">com.korbi.simplecurvecounter</string>
-    <string name="custom_url_scheme">com.korbi.simplecurvecounter</string>
+    <string name="app_name">Curve Counter Simple</string>
+    <string name="title_activity_main">Curve Counter Simple</string>
+    <string name="package_name">com.korbi.curvecountersimple</string>
+    <string name="custom_url_scheme">com.korbi.curvecountersimple</string>
     <string name="notification_channel">Fahrt</string>
+    <string name="notification_channel_watch">Fahrt auf der Uhr</string>
     <string name="notification_recording">Fahrt wird aufgezeichnet</string>
 </resources>

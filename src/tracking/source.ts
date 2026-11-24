@@ -24,7 +24,7 @@ export type Stop = () => void;
 export interface FixSource {
   readonly kind: 'native' | 'web' | 'demo';
   /** Starts recording a new session (clears the previous log). */
-  start(sessionId: string): Promise<void>;
+  start(sessionId: string, opts?: { power?: string; watch?: boolean }): Promise<void>;
   /** Stops recording and drops the log. */
   stop(): Promise<void>;
   /** Up to `limit` fixes with sequence number ≥ `from` (sequence numbers start at 0). */
@@ -76,6 +76,8 @@ export function webSource(): FixSource {
           lon: pos.coords.longitude,
           speed: pos.coords.speed != null && pos.coords.speed >= 0 ? pos.coords.speed : null,
           accuracy: pos.coords.accuracy,
+          // course over ground (browsers / iOS give it while moving)
+          bearing: pos.coords.heading != null && Number.isFinite(pos.coords.heading) && (pos.coords.speed ?? 0) > 1.5 ? pos.coords.heading : null,
           // TODO(plan 1.10): browsers report height above the ellipsoid; geoid correction
           alt: pos.coords.altitude ?? null,
         });
@@ -96,7 +98,7 @@ export function webSource(): FixSource {
 export function nativeSource(): FixSource {
   return {
     kind: 'native',
-    start: (sessionId) => Recorder.start({ sessionId }),
+    start: (sessionId, opts) => Recorder.start({ sessionId, power: opts?.power, watch: opts?.watch }),
     stop: () => Recorder.stop(),
     read: (from, limit) => Recorder.read({ from, limit }),
     active: async () => (await Recorder.status()).sessionId,

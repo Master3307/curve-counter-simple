@@ -78,7 +78,7 @@ describe('CurveDetector', () => {
     expect(c[0].angle).toBeGreaterThan(140);
   });
 
-  it('ignores slow junction turns', () => {
+  it('counts slow junction turns (bus at a junction, into a driveway)', () => {
     const c = run(
       simulate([
         { kind: 'straight', length: 200, speedKmh: 40 },
@@ -86,7 +86,87 @@ describe('CurveDetector', () => {
         { kind: 'straight', length: 200, speedKmh: 40 },
       ]),
     );
+    expect(dirs(c)).toBe('R');
+  });
+
+  it('counts a turn into a parking lot that ends in a stop', () => {
+    const c = run(
+      simulate([
+        { kind: 'straight', length: 300, speedKmh: 40 },
+        { kind: 'arc', radius: 12, angle: -90, speedKmh: 10 },
+        { kind: 'straight', length: 25, speedKmh: 8 },
+        { kind: 'stop', seconds: 60 },
+      ]),
+    );
+    expect(dirs(c)).toBe('L');
+  });
+
+  it('a stop at a traffic light inside a ramp loop does not cancel the curve', () => {
+    const c = run(
+      simulate([
+        { kind: 'straight', length: 300, speedKmh: 50 },
+        { kind: 'arc', radius: 25, angle: -180, speedKmh: 25 },
+        { kind: 'stop', seconds: 40 },
+        { kind: 'arc', radius: 25, angle: -80, speedKmh: 15 },
+        { kind: 'straight', length: 300, speedKmh: 50 },
+      ]),
+    );
+    expect(dirs(c)).toBe('L');
+    expect(c[0].angle).toBeGreaterThan(230);
+  });
+
+  it('GPS jitter while standing still draws no curves', () => {
+    const c = run(simulate([{ kind: 'straight', length: 200, speedKmh: 40 }, { kind: 'stop', seconds: 1800 }], { noise: 6, seed: 9 }));
     expect(c).toHaveLength(0);
+  });
+
+  it('walking pace (pushing the bike) does not count', () => {
+    const c = run(
+      simulate([
+        { kind: 'straight', length: 60, speedKmh: 4.5 },
+        { kind: 'arc', radius: 8, angle: 90, speedKmh: 4.5 },
+        { kind: 'straight', length: 60, speedKmh: 4.5 },
+      ]),
+    );
+    expect(c).toHaveLength(0);
+  });
+
+  it('a sharp 90° corner inside one resampling step is not thrown away as a glitch', () => {
+    // planned route: corner exactly at a vertex, no smoothing by the road
+    const c = run(
+      simulate([
+        { kind: 'straight', length: 300, speedKmh: 30 },
+        { kind: 'arc', radius: 1, angle: 90, speedKmh: 30 },
+        { kind: 'straight', length: 300, speedKmh: 30 },
+      ]),
+    );
+    expect(dirs(c)).toBe('R');
+    expect(c[0].angle).toBeGreaterThan(80);
+  });
+
+  it('a single GPS spike on a straight is ignored', () => {
+    const fixes = simulate([{ kind: 'straight', length: 2000, speedKmh: 60 }]);
+    const i = 60;
+    fixes[i] = { ...fixes[i], lon: fixes[i].lon + 0.0006 }; // ~45 m sideways for one fix
+    expect(run(fixes)).toHaveLength(0);
+  });
+
+  it('the gyroscope overrules a GPS jump it does not confirm', () => {
+    const fixes = simulate([{ kind: 'straight', length: 2000, speedKmh: 50 }]).map((f) => ({ ...f, yaw: 0 }));
+    // multipath: the position drifts 25 m sideways for 8 s and comes back
+    for (let k = 0; k < 8; k++) fixes[50 + k] = { ...fixes[50 + k], lon: fixes[50 + k].lon + 0.00035 * Math.sin((k / 7) * Math.PI) };
+    expect(run(fixes)).toHaveLength(0);
+  });
+
+  it('marks curves with a confidence and the sources that saw them', () => {
+    const fixes = simulate([
+      { kind: 'straight', length: 300, speedKmh: 60 },
+      { kind: 'arc', radius: 80, angle: 90, speedKmh: 50 },
+      { kind: 'straight', length: 300, speedKmh: 60 },
+    ]);
+    const c = run(fixes);
+    expect(c[0].confidence).toBeGreaterThan(0.5);
+    expect(c[0].sources).toBe('p');
   });
 
   it('ignores slight bends', () => {
@@ -243,5 +323,18 @@ describe('CurveDetector', () => {
       expect(c[0].lengthM).toBeLessThan(157 * 1.25);
       expect(c[0].endT).toBeGreaterThan(c[0].t);
     });
+  });
+});
+
+describe('sensor fusion safety', () => {
+  it('a stuck gyroscope (always 0) does not wipe out real curves', () => {
+    const fixes = simulate([
+      { kind: 'straight', length: 300, speedKmh: 60 },
+      { kind: 'arc', radius: 80, angle: 90, speedKmh: 50 },
+      { kind: 'straight', length: 300, speedKmh: 60 },
+      { kind: 'arc', radius: 80, angle: -90, speedKmh: 50 },
+      { kind: 'straight', length: 300, speedKmh: 60 },
+    ]).map((f) => ({ ...f, yaw: 0 }));
+    expect(dirs(run(fixes))).toBe('RL');
   });
 });
